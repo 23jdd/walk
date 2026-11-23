@@ -2,6 +2,8 @@ package walk
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -103,7 +105,7 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	if q.HasWrites() {
+	if q.HasWrites() && !q.Explain {
 		writeError(w, http.StatusBadRequest, fmt.Errorf("/query only accepts read-only queries; use /update"))
 		return
 	}
@@ -141,11 +143,20 @@ func (s *Server) execute(w http.ResponseWriter, r *http.Request, cypher string) 
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	sum := sha256.Sum256([]byte(cypher))
+	hash := hex.EncodeToString(sum[:])[:8]
+	var nodesWritten, edgesWritten int64
+	if res.Summary != nil {
+		nodesWritten = res.Summary.NodesCreated
+		edgesWritten = res.Summary.EdgesCreated
+	}
 	s.opts.Logger.Info("query",
+		"query_hash", hash,
 		"duration_ms", time.Since(start).Milliseconds(),
-		"solutions", len(res.Rows),
+		"solution_count", len(res.Rows),
 		"timeout_hit", ctx.Err() == context.DeadlineExceeded,
-		"query", cypher,
+		"nodes_written", nodesWritten,
+		"edges_written", edgesWritten,
 	)
 	writeJSON(w, http.StatusOK, res)
 }

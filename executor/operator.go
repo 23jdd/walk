@@ -71,16 +71,18 @@ func (e *Exec) Find(labels []string, props []PropPred, as string) Stream {
 func (e *Exec) findCandidateIDs(labels []string, props []PropPred) iter.Seq[uint64] {
 	return func(yield func(uint64) bool) {
 		if len(labels) > 0 {
-			for _, p := range props {
-				if p.Value.IsNull() || !e.HasIndex(labels[0], p.Name) {
-					continue
-				}
-				for id := range e.ScanIndexEquals(labels[0], p.Name, p.Value) {
-					if !yield(id) {
-						return
+			for _, label := range labels {
+				for _, p := range props {
+					if p.Value.IsNull() || !e.HasIndex(label, p.Name) {
+						continue
 					}
+					for id := range e.ScanIndexEquals(label, p.Name, p.Value) {
+						if !yield(id) {
+							return
+						}
+					}
+					return
 				}
-				return
 			}
 			best := labels[0]
 			bestCount := -1
