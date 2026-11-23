@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="walkLogoTitle walkLogoDesc">
+  <title id="walkLogoTitle">walk</title>
+  <desc id="walkLogoDesc">A property-graph path with four nodes forming a W, suggesting a walk through a graph.</desc>
+
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B1220"/>
+      <stop offset="0.55" stop-color="#0A1F2B"/>
+      <stop offset="1" stop-color="#07302C"/>
+    </linearGradient>
+
+    <linearGradient id="path" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#22D3EE"/>
+      <stop offset="0.5" stop-color="#34D399"/>
+      <stop offset="1" stop-color="#A3E635"/>
+    </linearGradient>
+
+    <radialGradient id="halo" cx="0.5" cy="0.42" r="0.62">
+      <stop offset="0" stop-color="#22D3EE" stop-opacity="0.22"/>
+      <stop offset="0.65" stop-color="#34D399" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#34D399" stop-opacity="0"/>
+    </radialGradient>
+
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="nodeGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- App tile -->
+  <rect x="8" y="8" width="240" height="240" rx="58" fill="url(#bg)"/>
+  <rect x="8.75" y="8.75" width="238.5" height="238.5" rx="57.25" fill="none" stroke="#1E3A46" stroke-width="1.5"/>
+  <rect x="8" y="8" width="240" height="240" rx="58" fill="url(#halo)"/>
+
+  <!-- Faint background graph -->
+  <g fill="none" stroke="#7DD3FC" stroke-opacity="0.10" stroke-width="1.5">
+    <path d="M50 197 L122 215 L205 190"/>
+    <path d="M54 63 L142 44 L214 63"/>
+    <path d="M36 128 L70 128"/>
+    <path d="M190 128 L226 128"/>
+  </g>
+  <g fill="#7DD3FC" fill-opacity="0.16">
+    <circle cx="50" cy="197" r="4"/>
+    <circle cx="122" cy="215" r="4"/>
+    <circle cx="205" cy="190" r="4"/>
+    <circle cx="54" cy="63" r="4"/>
+    <circle cx="142" cy="44" r="4"/>
+    <circle cx="214" cy="63" r="4"/>
+    <circle cx="36" cy="128" r="4"/>
+    <circle cx="226" cy="128" r="4"/>
+  </g>
+
+  <!-- Walking route forming a W -->
+  <path d="M54 82 L98 174 L140 104 L182 174 L218 86"
+        fill="none" stroke="url(#path)" stroke-width="13"
+        stroke-linecap="round" stroke-linejoin="round"
+        filter="url(#glow)"/>
+
+  <!-- Direction arrow at the end of the walk -->
+  <path d="M218 86 L236 56" fill="none" stroke="url(#path)" stroke-width="8"
+        stroke-linecap="round" opacity="0.9"/>
+  <path d="M228 55 L239 52 L237 64" fill="none" stroke="#A3E635" stroke-width="5"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Graph nodes -->
+  <g filter="url(#nodeGlow)">
+    <circle cx="54" cy="82" r="13" fill="#071019" stroke="url(#path)" stroke-width="6"/>
+    <circle cx="98" cy="174" r="13" fill="#071019" stroke="url(#path)" stroke-width="6"/>
+    <circle cx="140" cy="104" r="11" fill="#071019" stroke="url(#path)" stroke-width="5.5"/>
+    <circle cx="182" cy="174" r="13" fill="#071019" stroke="url(#path)" stroke-width="6"/>
+    <circle cx="218" cy="86" r="11" fill="#071019" stroke="url(#path)" stroke-width="5.5"/>
+  </g>
+  <g fill="#ECFEFF">
+    <circle cx="54" cy="82" r="3.4"/>
+    <circle cx="98" cy="174" r="3.4"/>
+    <circle cx="140" cy="104" r="2.9"/>
+    <circle cx="182" cy="174" r="3.4"/>
+    <circle cx="218" cy="86" r="2.9"/>
+  </g>
+
+  <!-- Walking trail dots -->
+  <g fill="#A3E635" fill-opacity="0.55">
+    <circle cx="64" cy="202" r="3"/>
+    <circle cx="82" cy="211" r="2.2"/>
+    <circle cx="101" cy="216" r="1.6"/>
+  </g>
+</svg>

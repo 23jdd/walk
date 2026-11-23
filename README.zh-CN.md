@@ -2,6 +2,10 @@
 
 [English](README.md) | **简体中文**
 
+<p align="center">
+  <img src="logo.svg" alt="walk logo" width="128" height="128">
+</p>
+
 `walk` 是一个单机版带标签属性图数据库与 Cypher 子集查询引擎，底层使用
 [`bbolt`](https://github.com/etcd-io/bbolt)。节点、带类型的关系边和邻接倒排索引都存储在
 同一个 B+ 树文件中，并同时提供 CLI 与 HTTP 服务接口。
