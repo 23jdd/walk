@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -67,18 +68,36 @@ type commonFlags struct {
 func addCommon(fs *flag.FlagSet) *commonFlags {
 	c := &commonFlags{}
 	fs.StringVar(&c.db, "db", envDefault("WALK_DB", "./graph.db"), "database file")
-	fs.DurationVar(&c.timeout, "timeout", 5*time.Second, "query timeout")
-	fs.IntVar(&c.maxSolutions, "max-solutions", 1_000_000, "maximum solutions")
-	fs.IntVar(&c.maxDepth, "max-depth", 8, "variable-length path maximum depth")
-	fs.IntVar(&c.maxDetach, "max-detach", 100_000, "DETACH DELETE maximum edges")
-	fs.IntVar(&c.batchSize, "batch-size", 5_000, "import batch size")
-	fs.StringVar(&c.logLevel, "log-level", "warn", "log level")
+	fs.DurationVar(&c.timeout, "timeout", envDuration("WALK_TIMEOUT", 5*time.Second), "query timeout")
+	fs.IntVar(&c.maxSolutions, "max-solutions", envInt("WALK_MAX_SOLUTIONS", 1_000_000), "maximum solutions")
+	fs.IntVar(&c.maxDepth, "max-depth", envInt("WALK_MAX_DEPTH", 8), "variable-length path maximum depth")
+	fs.IntVar(&c.maxDetach, "max-detach", envInt("WALK_MAX_DETACH", 100_000), "DETACH DELETE maximum edges")
+	fs.IntVar(&c.batchSize, "batch-size", envInt("WALK_BATCH_SIZE", 5_000), "import batch size")
+	fs.StringVar(&c.logLevel, "log-level", envDefault("WALK_LOG_LEVEL", "warn"), "log level")
 	return c
 }
 
 func envDefault(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return def
+}
+
+func envInt(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return def
+}
+
+func envDuration(key string, def time.Duration) time.Duration {
+	if v := os.Getenv(key); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			return d
+		}
 	}
 	return def
 }

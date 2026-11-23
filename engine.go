@@ -87,7 +87,12 @@ func (g *engine) run() (*Result, error) {
 		return res, nil
 	}
 	if g.q.Return == nil {
+		n := 0
 		for range stream {
+			n++
+			if err := g.e.CheckSolutionCount(n); err != nil {
+				return nil, err
+			}
 		}
 		if err := g.e.Err(); err != nil {
 			return nil, err
@@ -120,10 +125,16 @@ func (g *engine) run() (*Result, error) {
 
 func (g *engine) build() (executor.Stream, error) {
 	stream := singleSolution()
+	conjuncts := splitAnd(g.q.Where)
+	usedConjunct := make([]bool, len(conjuncts))
 	first := true
 	for _, pat := range g.q.Match {
 		if err := g.validatePattern(pat); err != nil {
 			return nil, err
+		}
+		before := make(map[string]bool, len(g.bound))
+		for k := range g.bound {
+			before[k] = true
 		}
 		shared := g.patternSharesBinding(pat)
 		if !shared && !first {
@@ -134,14 +145,39 @@ func (g *engine) build() (executor.Stream, error) {
 			stream = g.compilePattern(stream, pat)
 		}
 		first = false
+		// Push down conjuncts that become fully bound by this pattern.
+		for i, ex := range conjuncts {
+			if usedConjunct[i] || ex == nil {
+				continue
+			}
+			vars := collectVars(ex)
+			if len(vars) == 0 {
+				continue
+			}
+			all := true
+			newly := false
+			for v := range vars {
+				if !g.bound[v] {
+					all = false
+					break
+				}
+				if !before[v] {
+					newly = true
+				}
+			}
+			if all && newly {
+				stream = g.e.Keep(stream, makePredicate(g.e, ex))
+				usedConjunct[i] = true
+				g.addPlan("Keep", "pushed WHERE filter", "", "", 0)
+			}
+		}
 	}
-	if g.q.Where != nil {
-		where := g.q.Where
+	for i, ex := range conjuncts {
+		if usedConjunct[i] || ex == nil {
+			continue
+		}
+		stream = g.e.Keep(stream, makePredicate(g.e, ex))
 		g.addPlan("Keep", "WHERE filter", "", "", 0)
-		stream = g.e.Keep(stream, func(sol executor.Solution) (executor.Value, error) {
-			ctx := &evalCtx{e: g.e, sol: sol}
-			return ctx.eval(where)
-		})
 	}
 	if len(g.q.Create) > 0 {
 		var err error
@@ -762,6 +798,18 @@ func (g *engine) projection(item *parser.ReturnItem) (executor.Projection, error
 		if isAgg {
 			p := executor.Projection{Agg: kind}
 			if arg != nil {
+				if kind == executor.AggCount {
+					if v, ok := arg.(*parser.VariableExpr); ok {
+						name := v.Name
+						p.AggArg = func(sol executor.Solution) (executor.Value, error) {
+							if _, ok := sol[name]; ok {
+								return executor.IntValue(1), nil
+							}
+							return executor.NullValue(), nil
+						}
+						return p, nil
+					}
+				}
 				a := arg
 				p.AggArg = func(sol executor.Solution) (executor.Value, error) {
 					return (&evalCtx{e: g.e, sol: sol}).eval(a)
@@ -920,6 +968,53 @@ func joinTypes(types []string) string {
 }
 
 func boolPath(s string) string { return s }
+
+func makePredicate(e *executor.Exec, ex parser.Expr) executor.EvalFunc {
+	return func(sol executor.Solution) (executor.Value, error) {
+		return (&evalCtx{e: e, sol: sol}).eval(ex)
+	}
+}
+
+// splitAnd flattens a conjunction into independently pushable predicates.
+func splitAnd(ex parser.Expr) []parser.Expr {
+	if ex == nil {
+		return nil
+	}
+	if b, ok := ex.(*parser.BinaryExpr); ok && b.Op == "AND" {
+		return append(splitAnd(b.Left), splitAnd(b.Right)...)
+	}
+	return []parser.Expr{ex}
+}
+
+func collectVars(ex parser.Expr) map[string]bool {
+	out := map[string]bool{}
+	var walk func(parser.Expr)
+	walk = func(e parser.Expr) {
+		switch x := e.(type) {
+		case *parser.VariableExpr:
+			out[x.Name] = true
+		case *parser.PropertyExpr:
+			walk(x.Target)
+		case *parser.UnaryExpr:
+			walk(x.Expr)
+		case *parser.IsNullExpr:
+			walk(x.Expr)
+		case *parser.BinaryExpr:
+			walk(x.Left)
+			walk(x.Right)
+		case *parser.FuncExpr:
+			for _, a := range x.Args {
+				walk(a)
+			}
+		case *parser.MapExpr:
+			for _, p := range x.Entries {
+				walk(p.Value)
+			}
+		}
+	}
+	walk(ex)
+	return out
+}
 
 // sortedVars is used by tests and EXPLAIN for deterministic output.
 func sortedVars(m map[string]bool) []string {

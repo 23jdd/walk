@@ -211,6 +211,9 @@ func (e *Exec) Give(in Stream, items []Projection, opt GiveOptions) RowStream {
 				return
 			}
 			emitted++
+			if err := e.CheckSolutionCount(emitted); err != nil {
+				return
+			}
 			if !yield(row) {
 				return
 			}
@@ -284,6 +287,9 @@ func (e *Exec) emitProjected(rows []projectedRow, items []Projection, opt GiveOp
 			return
 		}
 		emitted++
+		if err := e.CheckSolutionCount(emitted); err != nil {
+			return
+		}
 		if !yield(pr.row) {
 			return
 		}
