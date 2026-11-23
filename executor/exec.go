@@ -75,7 +75,8 @@ type Exec struct {
 	nodes map[uint64]*Node
 	edges map[uint64]*Edge
 
-	Summary WriteSummary
+	Warnings []string
+	Summary  WriteSummary
 }
 
 func NewExec(tx *bbolt.Tx, ctx context.Context, cfg Config) *Exec {
@@ -104,6 +105,16 @@ func (e *Exec) Fail(err error) {
 }
 
 func (e *Exec) Err() error { return e.err }
+
+// Warn records a non-fatal planner/executor warning (EXPLAIN and CLI output).
+func (e *Exec) Warn(msg string) {
+	for _, w := range e.Warnings {
+		if w == msg {
+			return
+		}
+	}
+	e.Warnings = append(e.Warnings, msg)
+}
 
 // Check returns a cancellation error if the context is done.
 func (e *Exec) Check() error {
