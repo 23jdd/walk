@@ -50,16 +50,16 @@ func (c Config) withDefaults() Config {
 
 // WriteSummary reports write-query counters (see the operator specification).
 type WriteSummary struct {
-	NodesCreated   int64 `json:"nodes_created"`
-	NodesDeleted   int64 `json:"nodes_deleted"`
-	EdgesCreated   int64 `json:"edges_created"`
-	EdgesDeleted   int64 `json:"edges_deleted"`
-	PropertiesSet  int64 `json:"properties_set"`
-	LabelsAdded    int64 `json:"labels_added"`
-	LabelsRemoved  int64 `json:"labels_removed"`
-	EdgesSkipped   int64 `json:"edges_skipped"`
-	NodesMatched   int64 `json:"nodes_matched"`
-	EdgesMatched   int64 `json:"edges_matched"`
+	NodesCreated  int64 `json:"nodes_created"`
+	NodesDeleted  int64 `json:"nodes_deleted"`
+	EdgesCreated  int64 `json:"edges_created"`
+	EdgesDeleted  int64 `json:"edges_deleted"`
+	PropertiesSet int64 `json:"properties_set"`
+	LabelsAdded   int64 `json:"labels_added"`
+	LabelsRemoved int64 `json:"labels_removed"`
+	EdgesSkipped  int64 `json:"edges_skipped"`
+	NodesMatched  int64 `json:"nodes_matched"`
+	EdgesMatched  int64 `json:"edges_matched"`
 }
 
 // Exec is a single-operation executor bound to one bbolt transaction. It is
@@ -435,8 +435,8 @@ func (e *Exec) DeleteNode(id uint64, detach bool) error {
 }
 
 // Legacy aliases.
-func (e *Exec) deleteNode(id uint64) error         { return e.DeleteNode(id, false) }
-func (e *Exec) detachDeleteNode(id uint64) error   { return e.DeleteNode(id, true) }
+func (e *Exec) deleteNode(id uint64) error       { return e.DeleteNode(id, false) }
+func (e *Exec) detachDeleteNode(id uint64) error { return e.DeleteNode(id, true) }
 func (e *Exec) updateNodeProperty(id uint64, p map[string]Value) error {
 	return e.SetNodeProperties(id, p, false)
 }

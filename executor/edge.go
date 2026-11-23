@@ -7,11 +7,11 @@ import (
 
 // Edge is a directed, typed relationship between two nodes.
 type Edge struct {
-	ID     uint64
-	From   uint64           `json:"from"`
-	To     uint64           `json:"to"`
-	Type   string           `json:"type"`
-	Props  map[string]Value `json:"props"`
+	ID    uint64
+	From  uint64           `json:"from"`
+	To    uint64           `json:"to"`
+	Type  string           `json:"type"`
+	Props map[string]Value `json:"props"`
 }
 
 func NewEdge() *Edge {
@@ -58,7 +58,7 @@ func (e *Edge) Unmarshal(data []byte) error {
 	return nil
 }
 
-func (e *Edge) marshal() ([]byte, error)  { return e.Marshal() }
+func (e *Edge) marshal() ([]byte, error) { return e.Marshal() }
 func (e *Edge) unMarshal(b []byte) error { return e.Unmarshal(b) }
 
 func (e *Edge) WithProperties(props map[string]Value) *Edge {

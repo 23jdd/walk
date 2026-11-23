@@ -371,14 +371,14 @@ func rowKey(row Row) string {
 // ---------------------------------------------------------------------------
 
 type aggState struct {
-	count   int64
-	sumInt  int64
-	sumF    float64
-	useF    bool
-	seen    bool
-	min     Value
-	max     Value
-	hasNum  bool
+	count  int64
+	sumInt int64
+	sumF   float64
+	useF   bool
+	seen   bool
+	min    Value
+	max    Value
+	hasNum bool
 }
 
 func (a *aggState) add(v Value, kind AggKind) error {
