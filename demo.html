@@ -89,6 +89,25 @@
   .graph-toolbar .spacer { flex: 1; }
   .legend { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 9px; background: rgba(7, 12, 18, .72); border: 1px solid rgba(29, 44, 57, .8); border-radius: 8px; color: var(--muted); font-size: 10.5px; backdrop-filter: blur(6px); }
   .legend i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+  div.vis-tooltip {
+    padding: 0 !important; background: transparent !important; border: 0 !important;
+    box-shadow: none !important; white-space: normal !important; max-width: 340px;
+    pointer-events: none; z-index: 20;
+  }
+  .walk-tip {
+    max-width: 330px; padding: 10px 12px; color: var(--text);
+    background: linear-gradient(180deg, #0e1c28, #0a141d);
+    border: 1px solid rgba(217, 180, 91, .38); border-radius: 10px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, .55);
+    font: 12px/1.65 var(--sans); white-space: normal;
+  }
+  .walk-tip .tip-head { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; margin-bottom: 5px; }
+  .walk-tip .tip-head b { font: 600 16px/1.2 var(--serif); color: var(--gold-soft); }
+  .walk-tip .tip-head span { color: var(--muted); font-size: 10.5px; }
+  .walk-tip .tip-meta { color: #9fb3c7; font-size: 11px; margin-bottom: 3px; }
+  .walk-tip .tip-title { color: var(--jade); font-size: 11px; margin-bottom: 5px; }
+  .walk-tip .tip-bio { color: #c6d3dd; border-top: 1px solid rgba(217, 180, 91, .16); padding-top: 6px; }
+  .walk-tip .tip-type { display: inline-block; padding: 1px 6px; border: 1px solid rgba(217, 180, 91, .35); border-radius: 4px; color: var(--gold-soft); font-size: 10px; }
   .path-banner { position: absolute; left: 50%; top: 58px; transform: translateX(-50%); z-index: 4; display: none; align-items: center; gap: 10px; padding: 8px 12px; background: rgba(10, 18, 26, .94); border: 1px solid rgba(217, 180, 91, .45); border-radius: 999px; box-shadow: 0 12px 32px rgba(0, 0, 0, .4); font-size: 12px; color: var(--gold-soft); max-width: min(760px, calc(100% - 32px)); }
   .path-banner.show { display: flex; }
   .path-banner .chain { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -305,6 +324,26 @@
   function dynastyColor(d) { return DYNASTY_COLORS[d] || '#8b9bab'; }
   function relLabel(t) { return REL_LABELS[t] || t; }
   function relColor(t) { return REL_COLORS[t] || '#64809a'; }
+  function tipElement(html) {
+    const el = document.createElement('div');
+    el.className = 'walk-tip';
+    el.innerHTML = html;
+    return el;
+  }
+  function nodeTooltip(props, dynasty) {
+    return tipElement(
+      `<div class="tip-head"><b>${esc(props.name || '')}</b>${props.zi ? `<span>字 ${esc(props.zi)}</span>` : ''}</div>` +
+      `<div class="tip-meta">${esc(dynasty || '')} · ${year(props.born)}—${year(props.died)}</div>` +
+      (props.title ? `<div class="tip-title">${esc(props.title)}</div>` : '') +
+      (props.bio ? `<div class="tip-bio">${esc(props.bio)}</div>` : '')
+    );
+  }
+  function edgeTooltip(link) {
+    return tipElement(
+      `<div class="tip-head"><b>${esc(relLabel(link.type))}</b><span class="tip-type">${esc(link.type)}</span></div>` +
+      (link.props.note ? `<div class="tip-bio">${esc(link.props.note)}</div>` : '')
+    );
+  }
 
   function initNetwork() {
     state.network = new vis.Network($('network'), { nodes: state.nodesDS, edges: state.edgesDS }, {
@@ -410,7 +449,7 @@
       const background = onPath ? '#f2cf76' : dim ? '#1a2733' : dynastyColor(d);
       nodes.push({
         id, label: props.name || '人物',
-        title: `<b>${esc(props.name || '')}</b>${props.zi ? ' · 字' + esc(props.zi) : ''}<br>${esc(d)} · ${year(props.born)}—${year(props.died)}<br>${esc(props.title || '')}<br><span style="color:#a9bac7">${esc(props.bio || '')}</span>`,
+        title: nodeTooltip(props, d),
         shape: 'dot', size: 18 + Math.min(14, (degrees.get(id) || 0) * 2),
         color: { background, border: selected ? '#f8fafc' : onPath ? '#fde68a' : 'rgba(244,213,141,.40)', highlight: { background: '#f2cf76', border: '#fff8e1' }, hover: { background: dim ? '#2a3a49' : dynastyColor(d), border: '#f4d58d' } },
         borderWidth: selected ? 4 : onPath ? 3 : 2,
@@ -428,7 +467,7 @@
       links.push({
         id: l.id, from: l.from, to: l.to,
         label: onPath || incident ? relLabel(l.type) : '',
-        title: `${relLabel(l.type)}${l.props.note ? '：' + esc(l.props.note) : ''}`,
+        title: edgeTooltip(l),
         arrows: { to: { enabled: true, scaleFactor: 0.55 } },
         color: { color: onPath ? '#f2cf76' : incident ? relColor(l.type) : dim ? '#1a2a37' : '#2a4356', highlight: '#f4d58d', hover: onPath ? '#fde68a' : relColor(l.type) },
         width: onPath ? 3 : incident ? 2 : 1.1,
