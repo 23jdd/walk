@@ -36,18 +36,18 @@ type BoltStats struct {
 
 // GraphStats is the shared CLI/HTTP statistics structure (F-07/F-21).
 type GraphStats struct {
-	Path       string                 `json:"path"`
-	FileSize   int64                  `json:"file_size"`
-	Nodes      int                    `json:"nodes"`
-	Edges      int                    `json:"edges"`
-	NodeSeq    uint64                 `json:"node_seq"`
-	EdgeSeq    uint64                 `json:"edge_seq"`
-	Labels     []executor.LabelCount  `json:"labels"`
-	Types      []executor.TypeCount   `json:"types"`
-	Buckets    []BucketStat           `json:"buckets"`
-	Indexes    map[string][]string    `json:"indexes"`
-	Warnings   []string               `json:"warnings,omitempty"`
-	Bolt       BoltStats              `json:"bolt"`
+	Path     string                `json:"path"`
+	FileSize int64                 `json:"file_size"`
+	Nodes    int                   `json:"nodes"`
+	Edges    int                   `json:"edges"`
+	NodeSeq  uint64                `json:"node_seq"`
+	EdgeSeq  uint64                `json:"edge_seq"`
+	Labels   []executor.LabelCount `json:"labels"`
+	Types    []executor.TypeCount  `json:"types"`
+	Buckets  []BucketStat          `json:"buckets"`
+	Indexes  map[string][]string   `json:"indexes"`
+	Warnings []string              `json:"warnings,omitempty"`
+	Bolt     BoltStats             `json:"bolt"`
 }
 
 // Stats collects live monitoring data inside one read transaction.
@@ -140,4 +140,3 @@ func (s *GraphStats) WriteTable(w io.Writer) error {
 }
 
 // CheckInvariants is implemented in the executor package (see exec_stats.go).
-

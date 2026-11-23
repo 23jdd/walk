@@ -23,11 +23,11 @@ type QueryOptions struct {
 
 // Result is the dual-shape query result described by the operator spec.
 type Result struct {
-	Columns  []string                `json:"columns"`
-	Rows     [][]any                 `json:"rows"`
-	Summary  *executor.WriteSummary  `json:"summary,omitempty"`
-	Warnings []string                `json:"warnings,omitempty"`
-	Plan     []string                `json:"plan,omitempty"`
+	Columns  []string               `json:"columns"`
+	Rows     [][]any                `json:"rows"`
+	Summary  *executor.WriteSummary `json:"summary,omitempty"`
+	Warnings []string               `json:"warnings,omitempty"`
+	Plan     []string               `json:"plan,omitempty"`
 }
 
 // Query parses, plans and executes one Cypher statement. Write statements run
