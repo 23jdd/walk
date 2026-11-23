@@ -356,8 +356,12 @@ func (p *Parser) parseReturn(q *Query) {
 			if p.err != nil {
 				return
 			}
-			item := &ReturnItem{Expr: ex, Span: Span{Start: start.Span.Start, End: p.cur.Span.End}}
-			item.Text = p.sourceBetween(start.Span.Start, p.cur.Span.End)
+			end := p.cur.Span.End
+			if p.cur.Type == As {
+				end = p.cur.Span.Start
+			}
+			item := &ReturnItem{Expr: ex, Span: Span{Start: start.Span.Start, End: end}}
+			item.Text = p.sourceBetween(start.Span.Start, end)
 			if item.Text == "" {
 				item.Text = ExprText(ex)
 			}
