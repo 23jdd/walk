@@ -40,13 +40,23 @@ go build -o walk ./cmd/walk
 On Windows the binary is `walk.exe`. The default database is `./graph.db`;
 override it with `--db` or the `WALK_DB` environment variable.
 
+Prefer a visual tour? See the [historical figures demo](demo.html).
+
 ## Historical figures demo
 
 A single-file, npm-free app lives in [demo.html](demo.html): a Chinese
 historical-figures relationship explorer powered by vis-network and walk's
 HTTP adapter. It ships with 31 people from 春秋 to 宋 and 38 relationships
-(师承、君臣、盟友、思想传承…), plus dynasty filters, search, detail cards and
-shortest relationship-chain discovery.
+(师承、君臣、盟友、思想传承…).
+
+What you can do:
+
+- filter by dynasty (春秋 / 战国 / 秦 / 西汉 / 三国 / 唐 / 宋)
+- filter by relationship type
+- search by name, 字号, dynasty or biography
+- click a person for a detail card with dates, title, bio and relations
+- jump to related people, random exploration, focus/reset view
+- pick two people to discover and highlight the shortest relationship chain
 
 ```bash
 go build -o walk ./cmd/walk
@@ -60,7 +70,8 @@ python -m http.server 8080
 
 Click “载入示例人物图谱” on first run, then click a person to explore. The
 server sends CORS headers, so a `file://` page can call
-`http://127.0.0.1:7474` directly.
+`http://127.0.0.1:7474` directly. If the API runs elsewhere, pass
+`?api=http://host:port` to `demo.html`.
 
 ## CLI
 
