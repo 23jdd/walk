@@ -1,5 +1,7 @@
 # walk
 
+**English** | [简体中文](README.zh-CN.md)
+
 `walk` is a single-node labelled property-graph database and Cypher-subset
 query engine built on [`bbolt`](https://github.com/etcd-io/bbolt). It stores
 nodes, typed edges and adjacency postings in one B+tree file, and exposes the
