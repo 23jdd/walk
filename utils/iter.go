@@ -146,3 +146,111 @@ func Enumerate[V any](seq iter.Seq[V]) iter.Seq2[int, V] {
 		}
 	}
 }
+
+// Intersect 计算多个 iter.Seq 的交集（按 seqs[0] 顺序输出，结果去重）
+func Intersect[V comparable](seqs ...iter.Seq[V]) iter.Seq[V] {
+	return func(yield func(V) bool) {
+		if len(seqs) == 0 {
+			return
+		}
+		if len(seqs) == 1 {
+			seen := make(map[V]struct{})
+			for v := range seqs[0] {
+				if _, ok := seen[v]; ok {
+					continue
+				}
+				seen[v] = struct{}{}
+				if !yield(v) {
+					return
+				}
+			}
+			return
+		}
+
+		// 为 seqs[1:] 各自建立集合，只要有一个序列为空，最终交集必为空
+		otherSets := make([]map[V]struct{}, len(seqs)-1)
+		for i, seq := range seqs[1:] {
+			s := make(map[V]struct{})
+			for v := range seq {
+				s[v] = struct{}{}
+			}
+			if len(s) == 0 {
+				return
+			}
+			otherSets[i] = s
+		}
+
+		emitted := make(map[V]struct{})
+		for v := range seqs[0] {
+			if _, ok := emitted[v]; ok {
+				continue
+			}
+			if !inAllSets(v, otherSets) {
+				continue
+			}
+			emitted[v] = struct{}{}
+			if !yield(v) {
+				return
+			}
+		}
+	}
+}
+
+func inAllSets[V comparable](v V, sets []map[V]struct{}) bool {
+	for _, s := range sets {
+		if _, ok := s[v]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// IntersectBy 按 keyFn 提取的键计算多个 iter.Seq 的交集（保留 seqs[0] 中首次匹配的元素）
+func IntersectBy[V any, K comparable](keyFn func(V) K, seqs ...iter.Seq[V]) iter.Seq[V] {
+	return func(yield func(V) bool) {
+		if len(seqs) == 0 {
+			return
+		}
+		if len(seqs) == 1 {
+			seen := make(map[K]struct{})
+			for v := range seqs[0] {
+				k := keyFn(v)
+				if _, ok := seen[k]; ok {
+					continue
+				}
+				seen[k] = struct{}{}
+				if !yield(v) {
+					return
+				}
+			}
+			return
+		}
+
+		otherSets := make([]map[K]struct{}, len(seqs)-1)
+		for i, seq := range seqs[1:] {
+			s := make(map[K]struct{})
+			for v := range seq {
+				s[keyFn(v)] = struct{}{}
+			}
+			if len(s) == 0 {
+				return
+			}
+			otherSets[i] = s
+		}
+
+		emitted := make(map[K]struct{})
+		for v := range seqs[0] {
+			k := keyFn(v)
+			if _, ok := emitted[k]; ok {
+				continue
+			}
+			if !inAllSets(k, otherSets) {
+				continue
+			}
+			emitted[k] = struct{}{}
+			if !yield(v) {
+				return
+			}
+		}
+	}
+}
