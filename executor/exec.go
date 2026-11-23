@@ -1,418 +1,457 @@
 package executor
 
 import (
-	"encoding/binary"
+	"context"
 	"errors"
+	"fmt"
 	"iter"
+	"sort"
 
-	"github.com/23jdd/walk/utils"
 	"go.etcd.io/bbolt"
 )
 
-var ErrInitBucket = errors.New("init bucket error")
-var ErrNodesNotExist = errors.New("node not exist")
-var ErrEdgesNotExist = errors.New("edge not exist")
-var ErrNodeIdDuplicated = errors.New("duplicated id node")
-var ErrNodeLinkEdge = errors.New("link edge error")
-var ErrEdgeFromOrToNodeNoExist = errors.New("edge from or to node not exist")
+var (
+	ErrInitBucket              = errors.New("init bucket error")
+	ErrNodesNotExist           = errors.New("node not exist")
+	ErrEdgesNotExist           = errors.New("edge not exist")
+	ErrNodeIDDuplicated        = errors.New("duplicated id node")
+	ErrNodeLinkEdge            = errors.New("node still has linked edges")
+	ErrEdgeFromOrToNodeNoExist = errors.New("edge from or to node not exist")
+	ErrLabelNotExists          = errors.New("label does not exist")
+	ErrRelationNotExists       = errors.New("relationship type does not exist")
+	ErrTooManyDetach           = errors.New("too many edges to detach")
+	ErrMaxSolutions            = errors.New("maximum solution count exceeded")
+	ErrContextCanceled         = errors.New("query canceled")
+)
 
-type Exec struct {
-	tx  *bbolt.Tx
-	err error
+// Config holds execution limits (F-04/F-09/F-10/F-15).
+type Config struct {
+	MaxSolutions int
+	MaxDepth     int
+	MaxDetach    int
 }
 
-func (e *Exec) fail(err error) {
-	if e.err == nil {
+func DefaultConfig() Config {
+	return Config{MaxSolutions: 1_000_000, MaxDepth: 8, MaxDetach: 100_000}
+}
+
+func (c Config) withDefaults() Config {
+	if c.MaxSolutions <= 0 {
+		c.MaxSolutions = 1_000_000
+	}
+	if c.MaxDepth <= 0 {
+		c.MaxDepth = 8
+	}
+	if c.MaxDetach <= 0 {
+		c.MaxDetach = 100_000
+	}
+	return c
+}
+
+// WriteSummary reports write-query counters (see the operator specification).
+type WriteSummary struct {
+	NodesCreated   int64 `json:"nodes_created"`
+	NodesDeleted   int64 `json:"nodes_deleted"`
+	EdgesCreated   int64 `json:"edges_created"`
+	EdgesDeleted   int64 `json:"edges_deleted"`
+	PropertiesSet  int64 `json:"properties_set"`
+	LabelsAdded    int64 `json:"labels_added"`
+	LabelsRemoved  int64 `json:"labels_removed"`
+	EdgesSkipped   int64 `json:"edges_skipped"`
+	NodesMatched   int64 `json:"nodes_matched"`
+	EdgesMatched   int64 `json:"edges_matched"`
+}
+
+// Exec is a single-operation executor bound to one bbolt transaction. It is
+// the storage API used by every operator.
+type Exec struct {
+	tx  *bbolt.Tx
+	ctx context.Context
+	cfg Config
+
+	err       error
+	solutions int
+
+	nodes map[uint64]*Node
+	edges map[uint64]*Edge
+
+	Summary WriteSummary
+}
+
+func NewExec(tx *bbolt.Tx, ctx context.Context, cfg Config) *Exec {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return &Exec{
+		tx:    tx,
+		ctx:   ctx,
+		cfg:   cfg.withDefaults(),
+		nodes: make(map[uint64]*Node),
+		edges: make(map[uint64]*Edge),
+	}
+}
+
+func (e *Exec) Config() Config { return e.cfg }
+func (e *Exec) Context() context.Context {
+	return e.ctx
+}
+
+// Fail records the first error and stops the pipeline (fail-fast discipline).
+func (e *Exec) Fail(err error) {
+	if err != nil && e.err == nil {
 		e.err = err
 	}
 }
-func (e *Exec) insertNode(n *Node) (uint64, error) {
-	nodes := e.mustBucket("nodes")
-	id, err := nodes.NextSequence()
-	if err != nil {
-		return 0, err
+
+func (e *Exec) Err() error { return e.err }
+
+// Check returns a cancellation error if the context is done.
+func (e *Exec) Check() error {
+	if e.err != nil {
+		return e.err
 	}
-	value, err := n.marshal()
-	if err != nil {
-		return 0, err
-	}
-	n.id = id
-	err = nodes.Put(utob(id), value)
-	if err != nil {
-		return 0, err
-	}
-	ids, err := e.getOrCreateLabels(n.Labels...)
-	if err != nil {
-		return 0, err
-	}
-	for _, id := range ids {
-		err := e.insertLabelsIndex(n, id)
-		if err != nil {
-			return 0, err
+	select {
+	case <-e.ctx.Done():
+		if e.err == nil {
+			e.err = e.ctx.Err()
 		}
-	}
-	return id, nil
-}
-func (e *Exec) BatchInsertNode(ns iter.Seq[*Node]) error {
-	nodes := e.mustBucket("nodes")
-	for n := range ns {
-		id, err := nodes.NextSequence()
-		if err != nil {
-			return err
-		}
-		value, err := n.marshal()
-		if err != nil {
-			return err
-		}
-		n.id = id
-		err = nodes.Put(utob(id), value)
-		if err != nil {
-			return err
-		}
-		ids, err := e.getOrCreateLabels(n.Labels...)
-		if err != nil {
-			return err
-		}
-		for _, id := range ids {
-			err := e.insertLabelsIndex(n, id)
-			if err != nil {
-				return err
-			}
-		}
+		return e.err
+	default:
 	}
 	return nil
 }
 
-// InsertNodeWithId insert a point id Node
-//
-// Note: n where node id > current sequence where set node id as sequence
-func (e *Exec) InsertNodeWithId(n *Node) error {
-	nodes := e.mustBucket("nodes")
-	seq := nodes.Sequence()
-	if n.id > seq {
-		err := nodes.SetSequence(n.id)
-		if err != nil {
-			return err
-		}
-	}
-	id := utob(n.id)
-	value := nodes.Get(id)
-	if value != nil {
-		return ErrNodeIdDuplicated
-	}
-	value, err := n.marshal()
-	if err != nil {
+// Emit records one produced solution and enforces limits/timeouts every 1024
+// solutions (F-04).
+func (e *Exec) Emit() error {
+	if err := e.Check(); err != nil {
 		return err
 	}
-	err = nodes.Put(id, value)
-	if err != nil {
+	e.solutions++
+	if e.solutions > e.cfg.MaxSolutions {
+		err := fmt.Errorf("%w: limit %d", ErrMaxSolutions, e.cfg.MaxSolutions)
+		e.Fail(err)
 		return err
 	}
-	ids, err := e.getOrCreateLabels(n.Labels...)
-	if err != nil {
-		return err
-	}
-	for _, id := range ids {
-		err := e.insertLabelsIndex(n, id)
-		if err != nil {
-			return err
-		}
+	if e.solutions%1024 == 0 {
+		return e.Check()
 	}
 	return nil
 }
-func (e *Exec) GetNode(id uint64) (*Node, error) {
-	n := &Node{}
-	nodes := e.mustBucket("nodes")
-	values := nodes.Get(utob(id))
-	if values == nil {
-		return nil, ErrNodesNotExist
+
+func (e *Exec) bucket(name string) *bbolt.Bucket {
+	b := e.tx.Bucket([]byte(name))
+	if b == nil {
+		panic(fmt.Errorf("%w: %s", ErrInitBucket, name))
 	}
-	err := n.unMarshal(values)
-	if err != nil {
+	return b
+}
+
+// Legacy helper name.
+func (e *Exec) mustBucket(name string) *bbolt.Bucket { return e.bucket(name) }
+
+// ---------------------------------------------------------------------------
+// Node storage (F-01/F-05/F-14)
+// ---------------------------------------------------------------------------
+
+func (e *Exec) NodeCount() int { return e.bucket(BucketNodes).Stats().KeyN }
+
+func (e *Exec) AllNodeIDs() iter.Seq[uint64] {
+	return func(yield func(uint64) bool) {
+		c := e.bucket(BucketNodes).Cursor()
+		for k, _ := c.First(); k != nil; k, _ = c.Next() {
+			if len(k) != 8 {
+				continue
+			}
+			if !yield(btou(k)) {
+				return
+			}
+		}
+	}
+}
+
+func (e *Exec) GetNode(id uint64) (*Node, error) {
+	if n, ok := e.nodes[id]; ok {
+		return n, nil
+	}
+	raw := e.bucket(BucketNodes).Get(utob(id))
+	if raw == nil {
+		return nil, fmt.Errorf("%w: id=%d", ErrNodesNotExist, id)
+	}
+	n := NewNodeWithID(id)
+	if err := n.Unmarshal(raw); err != nil {
+		return nil, fmt.Errorf("decode node %d: %w", id, err)
+	}
+	e.nodes[id] = n
+	return n, nil
+}
+
+// nodeExists reports existence without decoding.
+func (e *Exec) NodeExists(id uint64) bool {
+	return e.bucket(BucketNodes).Get(utob(id)) != nil
+}
+
+// CreateNode allocates an id and writes the node plus its label/property
+// indexes in the current transaction.
+func (e *Exec) CreateNode(labels []string, props map[string]Value) (*Node, error) {
+	n := NewNode()
+	n.Labels = unionStrings(nil, labels...)
+	n.Props = make(map[string]Value, len(props))
+	for k, v := range props {
+		if v.IsNull() {
+			continue
+		}
+		n.Props[k] = v
+	}
+	if err := e.PutNode(n); err != nil {
 		return nil, err
 	}
 	return n, nil
 }
-func (e *Exec) GetNodeByLabel(label string) iter.Seq[uint64] {
-	return func(yield func(uint64) bool) {
-		labelId, err := e.getLabel(label)
-		if err != nil {
-			return
-		}
-		for id := range e.scanLabelsIndex(labelId) {
-			if !yield(id) {
-				return
-			}
-		}
-		return
-	}
-}
-func (e *Exec) DeleteNode(id uint64) error {
-	nodes := e.mustBucket("nodes")
-	if e.haveLinkEdge(id) {
-		return ErrNodeLinkEdge
-	}
-	err := nodes.Delete(utob(id))
-	if err != nil {
-		return err
-	}
-	return err
-}
-func (e *Exec) DetachDeleteNode(id uint64) error {
-	err := e.deleteEdgesIter(e.allLinkEdge(id))
-	if err != nil {
-		return err
-	}
-	nodes := e.mustBucket("nodes")
-	return nodes.Delete(utob(id))
-}
-func (e *Exec) UpdateNodeProperty(id uint64, properties map[string]Value) error {
-	nodes := e.mustBucket("nodes")
-	value := nodes.Get(utob(id))
-	node := NewNodes()
-	err := node.unMarshal(value)
-	if err != nil {
-		return err
-	}
-	// TODO
-	node.WithProperties(properties)
-	value, err = node.marshal()
-	if err != nil {
-		return err
-	}
-	return nodes.Put(utob(id), value)
-}
-func (e *Exec) DeleteNodeProperty(id uint64, keys ...string) error {
-	nodes := e.mustBucket("nodes")
-	value := nodes.Get(utob(id))
-	node := NewNodes()
-	err := node.unMarshal(value)
-	if err != nil {
-		return err
-	}
-	// TODO
-	utils.DeleteKeysBySlice(node.Properties, keys)
-	value, err = node.marshal()
-	if err != nil {
-		return err
-	}
-	return nodes.Put(utob(id), value)
-}
-func (e *Exec) RemoveNodeLabels(id uint64, labels ...string) error {
-	nodes := e.mustBucket("nodes")
-	value := nodes.Get(utob(id))
-	node := NewNodes()
-	err := node.unMarshal(value)
-	if err != nil {
-		return err
-	}
-	// TODO
-	node.Labels = utils.Difference(node.Labels, labels)
-	value, err = node.marshal()
-	if err != nil {
-		return err
-	}
-	return nodes.Put(utob(id), value)
-}
-func (e *Exec) AddNodeLabels(id uint64, labels ...string) error {
-	nodes := e.mustBucket("nodes")
-	value := nodes.Get(utob(id))
-	node := NewNodes()
-	err := node.unMarshal(value)
-	if err != nil {
-		return err
-	}
-	// TODO
-	node.Labels = utils.Union(node.Labels, labels)
-	value, err = node.marshal()
-	if err != nil {
-		return err
-	}
-	return nodes.Put(utob(id), value)
-}
-func (e *Exec) InsertEdge(edge *Edge) (uint64, error) {
-	// get relation typeId
-	typeId, err := e.getOrCreateRelationTypes(edge)
-	if err != nil {
-		return 0, err
-	}
-	edges := e.mustBucket("edges")
-	id, err := edges.NextSequence()
-	if err != nil {
-		return 0, err
-	}
-	edge.id = id
-	value, err := edge.marshal()
-	if err != nil {
-		return 0, err
-	}
-	err = edges.Put(utob(id), value)
-	if err != nil {
-		return 0, err
-	}
-	// insert adj index
-	err = e.insertAdjIndex(edge, typeId)
-	if err != nil {
-		return 0, err
-	}
-	err = e.insertRelationIndex(edge, typeId)
-	if err != nil {
-		return 0, err
-	}
-	return id, nil
-}
-func (e *Exec) InsertEdgeWithExist(edge *Edge) (uint64, error) {
-	nodes := e.mustBucket("nodes")
-	// judge from node and to node exist
-	if !exist(nodes, edge.From) || !exist(nodes, edge.To) {
 
-		return 0, ErrEdgeFromOrToNodeNoExist
-	}
-	// get or create relation typeId
-	typeId, err := e.getOrCreateRelationTypes(edge)
-	if err != nil {
-		return 0, err
-	}
-	edges := e.mustBucket("edges")
-	id, err := edges.NextSequence()
-	if err != nil {
-		return 0, err
-	}
-	edge.id = id
-	value, err := edge.marshal()
-	if err != nil {
-		return 0, err
-	}
-	// insert edges
-	err = edges.Put(utob(id), value)
-	if err != nil {
-		return 0, err
-	}
-	// insert adj index
-	err = e.insertAdjIndex(edge, typeId)
-	if err != nil {
-		return 0, err
-	}
-	err = e.insertRelationIndex(edge, typeId)
-	if err != nil {
-		return 0, err
-	}
-	return id, nil
-}
-func (e *Exec) GetEdge(id uint64) (*Edge, error) {
-	edge := &Edge{}
-	edges := e.mustBucket("edges")
-	values := edges.Get(utob(id))
-	if values == nil {
-		return nil, ErrEdgesNotExist
-	}
-	err := edge.unMarshal(values)
-	if err != nil {
-		return nil, err
-	}
-	return edge, nil
-}
-func (e *Exec) GetEdgeByRelation(relation string) iter.Seq[uint64] {
-	return func(yield func(uint64) bool) {
-		typeId, err := e.getRelationTypes(relation)
-		if err != nil {
-			return
-		}
-		for id := range e.scanRelationIndex(typeId) {
-			if !yield(id) {
-				return
-			}
-		}
-	}
-}
-func (e *Exec) UpdateEdgeProperty(id uint64, properties map[string]Value) error {
-	edges := e.mustBucket("edges")
-	value := edges.Get(utob(id))
-	edge := NewEdge()
-	err := edge.unMarshal(value)
-	if err != nil {
+// PutNode inserts a node. A zero ID triggers sequence allocation; a non-zero
+// ID is treated as an explicit import and must not collide (F-05).
+func (e *Exec) PutNode(n *Node) error {
+	if err := e.Check(); err != nil {
 		return err
 	}
-	// TODO
-	edge.WithProperties(properties)
-	value, err = edge.marshal()
-	if err != nil {
+	if n == nil {
+		return fmt.Errorf("nil node")
+	}
+	cleanNullProps(n.Props)
+	if err := verifyNode(n); err != nil {
 		return err
 	}
-	return edges.Put(utob(id), value)
-}
-func (e *Exec) DeleteEdgeProperty(id uint64, keys ...string) error {
-	edges := e.mustBucket("edges")
-	value := edges.Get(utob(id))
-	edge := NewEdge()
-	err := edge.unMarshal(value)
-	if err != nil {
-		return err
-	}
-	// TODO
-	utils.DeleteKeysBySlice(edge.Properties, keys)
-	value, err = edge.marshal()
-	if err != nil {
-		return err
-	}
-	return edges.Put(utob(id), value)
-}
-func (e *Exec) deleteEdge(id uint64) error {
-	edges := e.mustBucket("edges")
-	return edges.Delete(utob(id))
-}
-func (e *Exec) deleteEdgesIter(ids iter.Seq[uint64]) error {
-	edges := e.mustBucket("edges")
-	for id := range ids {
-		err := edges.Delete(utob(id))
+	nodes := e.bucket(BucketNodes)
+	if n.ID == 0 {
+		id, err := nodes.NextSequence()
 		if err != nil {
 			return err
 		}
+		n.ID = id
+	} else {
+		if nodes.Get(utob(n.ID)) != nil {
+			return fmt.Errorf("%w: id=%d", ErrNodeIDDuplicated, n.ID)
+		}
+		if seq := nodes.Sequence(); n.ID > seq {
+			if err := nodes.SetSequence(n.ID); err != nil {
+				return err
+			}
+		}
 	}
+	raw, err := n.Marshal()
+	if err != nil {
+		return err
+	}
+	if err := nodes.Put(utob(n.ID), raw); err != nil {
+		return err
+	}
+	if err := e.indexNode(n, nil); err != nil {
+		return err
+	}
+	e.nodes[n.ID] = n
+	e.Summary.NodesCreated++
 	return nil
 }
-func (e *Exec) NodesCount() int {
-	return e.countBucket("nodes")
-}
-func (e *Exec) EdgeCount() int {
-	return e.countBucket("edges")
+
+// UpdateNode applies fn to the stored node and rewrites indexes atomically.
+func (e *Exec) UpdateNode(id uint64, fn func(n *Node) error) (*Node, error) {
+	old, err := e.GetNode(id)
+	if err != nil {
+		return nil, err
+	}
+	next := &Node{ID: old.ID, Labels: append([]string(nil), old.Labels...), Props: make(map[string]Value, len(old.Props))}
+	for k, v := range old.Props {
+		next.Props[k] = v
+	}
+	if err := fn(next); err != nil {
+		return nil, err
+	}
+	cleanNullProps(next.Props)
+	if err := verifyNode(next); err != nil {
+		return nil, err
+	}
+	raw, err := next.Marshal()
+	if err != nil {
+		return nil, err
+	}
+	if err := e.bucket(BucketNodes).Put(utob(id), raw); err != nil {
+		return nil, err
+	}
+	if err := e.reindexNode(old, next); err != nil {
+		return nil, err
+	}
+	e.nodes[id] = next
+	return next, nil
 }
 
-// countBucket return bucket include key-value pair count
-func (e *Exec) countBucket(bucket string) int {
-	return e.mustBucket(bucket).Stats().KeyN
+func (e *Exec) SetNodeProperties(id uint64, props map[string]Value, replace bool) error {
+	_, err := e.UpdateNode(id, func(n *Node) error {
+		if replace && props != nil {
+			n.Props = make(map[string]Value, len(props))
+		}
+		for k, v := range props {
+			if v.IsNull() {
+				delete(n.Props, k)
+				continue
+			}
+			n.Props[k] = v
+		}
+		e.Summary.PropertiesSet++
+		return nil
+	})
+	return err
 }
-func (e *Exec) CountLabelsNode(label string) int {
-	id, err := e.getLabel(label)
+
+func (e *Exec) DeleteNodeProperties(id uint64, keys ...string) error {
+	_, err := e.UpdateNode(id, func(n *Node) error {
+		for _, k := range keys {
+			delete(n.Props, k)
+		}
+		return nil
+	})
+	return err
+}
+
+func (e *Exec) AddNodeLabels(id uint64, labels ...string) error {
+	_, err := e.UpdateNode(id, func(n *Node) error {
+		for _, l := range labels {
+			if err := verifyName("label", l); err != nil {
+				return err
+			}
+			if !n.HasLabel(l) {
+				n.Labels = append(n.Labels, l)
+				e.Summary.LabelsAdded++
+			}
+		}
+		return nil
+	})
+	return err
+}
+
+func (e *Exec) RemoveNodeLabels(id uint64, labels ...string) error {
+	_, err := e.UpdateNode(id, func(n *Node) error {
+		for _, l := range labels {
+			if n.HasLabel(l) {
+				n.Labels = removeString(n.Labels, l)
+				e.Summary.LabelsRemoved++
+			}
+		}
+		return nil
+	})
+	return err
+}
+
+// EdgeIDsOfNode returns the deduplicated ids of all edges incident to a node.
+func (e *Exec) EdgeIDsOfNode(id uint64) ([]uint64, error) {
+	seen := make(map[uint64]struct{})
+	var out []uint64
+	add := func(edgeID uint64) {
+		if _, ok := seen[edgeID]; ok {
+			return
+		}
+		seen[edgeID] = struct{}{}
+		out = append(out, edgeID)
+	}
+	outBucket := e.bucket(BucketAdjOut)
+	prefix := utob(id)
+	c := outBucket.Cursor()
+	for k, _ := c.Seek(prefix); k != nil && hasPrefix(k, prefix); k, _ = c.Next() {
+		if len(k) == 24 {
+			add(btou(k[16:]))
+		}
+	}
+	inBucket := e.bucket(BucketAdjIn)
+	c = inBucket.Cursor()
+	for k, _ := c.Seek(prefix); k != nil && hasPrefix(k, prefix); k, _ = c.Next() {
+		if len(k) == 24 {
+			add(btou(k[16:]))
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out, nil
+}
+
+// DeleteNode implements DELETE / DETACH DELETE semantics (F-15).
+func (e *Exec) DeleteNode(id uint64, detach bool) error {
+	if err := e.Check(); err != nil {
+		return err
+	}
+	edgeIDs, err := e.EdgeIDsOfNode(id)
+	if err != nil {
+		return err
+	}
+	if len(edgeIDs) > 0 {
+		if !detach {
+			return fmt.Errorf("%w: id=%d edges=%d (use DETACH DELETE)", ErrNodeLinkEdge, id, len(edgeIDs))
+		}
+		if len(edgeIDs) > e.cfg.MaxDetach {
+			return fmt.Errorf("%w: %d > --max-detach %d", ErrTooManyDetach, len(edgeIDs), e.cfg.MaxDetach)
+		}
+		for _, edgeID := range edgeIDs {
+			if err := e.DeleteEdge(edgeID); err != nil {
+				return err
+			}
+		}
+	}
+	n, err := e.GetNode(id)
+	if err != nil {
+		return err
+	}
+	if err := e.unindexNode(n); err != nil {
+		return err
+	}
+	if err := e.bucket(BucketNodes).Delete(utob(id)); err != nil {
+		return err
+	}
+	delete(e.nodes, id)
+	e.Summary.NodesDeleted++
+	return nil
+}
+
+// Legacy aliases.
+func (e *Exec) deleteNode(id uint64) error         { return e.DeleteNode(id, false) }
+func (e *Exec) detachDeleteNode(id uint64) error   { return e.DeleteNode(id, true) }
+func (e *Exec) updateNodeProperty(id uint64, p map[string]Value) error {
+	return e.SetNodeProperties(id, p, false)
+}
+func (e *Exec) deleteNodeProperty(id uint64, keys ...string) error {
+	return e.DeleteNodeProperties(id, keys...)
+}
+func (e *Exec) addNodeLabels(id uint64, labels ...string) error {
+	return e.AddNodeLabels(id, labels...)
+}
+func (e *Exec) removeNodeLabels(id uint64, labels ...string) error {
+	return e.RemoveNodeLabels(id, labels...)
+}
+func (e *Exec) getNode(id uint64) (*Node, error) { return e.GetNode(id) }
+
+func (e *Exec) NodeCountByLabel(label string) int {
+	id, err := e.GetLabelID(label)
 	if err != nil {
 		return 0
 	}
 	return e.countLabelsNode(id)
 }
-func (e *Exec) CountRelationsEdge(relation string) int {
-	typeId, err := e.getRelationTypes(relation)
-	if err != nil {
-		return 0
+
+func removeString(a []string, s string) []string {
+	out := a[:0]
+	for _, v := range a {
+		if v != s {
+			out = append(out, v)
+		}
 	}
-	return e.countRelationEdge(typeId)
+	return out
 }
 
-func (e *Exec) mustBucket(key string) *bbolt.Bucket {
-	bucket := e.tx.Bucket([]byte(key))
-	if bucket == nil {
-		panic(ErrInitBucket)
+func hasPrefix(b, p []byte) bool {
+	if len(b) < len(p) {
+		return false
 	}
-	return bucket
-}
-
-func utob(id uint64) []byte {
-	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, id)
-	return buf
-}
-func btou(buf []byte) uint64 {
-	return binary.BigEndian.Uint64(buf)
-}
-func exist(bucket *bbolt.Bucket, key uint64) bool {
-	return bucket.Get(utob(key)) != nil
+	for i := range p {
+		if b[i] != p[i] {
+			return false
+		}
+	}
+	return true
 }
