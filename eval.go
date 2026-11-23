@@ -291,7 +291,7 @@ func (c *evalCtx) constValue(ex parser.Expr) (executor.Value, error) {
 			return c.eval(ex)
 		}
 	}
-	return executor.NullValue(), fmt.Errorf("pattern values must be literals")
+	return executor.NullValue(), fmt.Errorf("pattern values must be literals (got %T for %s)", ex, parser.ExprText(ex))
 }
 
 func (c *evalCtx) constMap(props []*parser.Prop) (map[string]executor.Value, error) {
