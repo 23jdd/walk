@@ -8,5 +8,5 @@
 .tmppdf/
 docs/*.docx
 docs/operator-spec.txt
-/gstore
+/walk
 coverage.out
