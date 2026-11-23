@@ -179,7 +179,7 @@ func cmdLoad(args []string) int {
 	edges := fs.String("edges", "", "edges JSONL/CSV file")
 	format := fs.String("format", "auto", "auto|jsonl|csv")
 	quiet := fs.Bool("quiet", false, "suppress progress output")
-	if err := fs.Parse(args); err != nil {
+	if err := parseArgs(fs, args); err != nil {
 		return 1
 	}
 	setupLogger(common.logLevel)
@@ -219,7 +219,7 @@ func cmdQuery(args []string, write bool) int {
 	common := addCommon(fs)
 	explain := fs.Bool("explain", false, "print the execution plan")
 	jsonOut := fs.Bool("json", false, "print JSON instead of TSV")
-	if err := fs.Parse(args); err != nil {
+	if err := parseArgs(fs, args); err != nil {
 		return 1
 	}
 	setupLogger(common.logLevel)
@@ -319,7 +319,7 @@ func cmdStats(args []string) int {
 	fs.SetOutput(os.Stderr)
 	common := addCommon(fs)
 	jsonOut := fs.Bool("json", false, "print JSON")
-	if err := fs.Parse(args); err != nil {
+	if err := parseArgs(fs, args); err != nil {
 		return 1
 	}
 	setupLogger(common.logLevel)
@@ -352,7 +352,7 @@ func cmdBackup(args []string) int {
 	fs := flag.NewFlagSet("backup", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	common := addCommon(fs)
-	if err := fs.Parse(args); err != nil {
+	if err := parseArgs(fs, args); err != nil {
 		return 1
 	}
 	setupLogger(common.logLevel)
@@ -378,7 +378,7 @@ func cmdCompact(args []string) int {
 	fs := flag.NewFlagSet("compact", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	common := addCommon(fs)
-	if err := fs.Parse(args); err != nil {
+	if err := parseArgs(fs, args); err != nil {
 		return 1
 	}
 	setupLogger(common.logLevel)
@@ -410,7 +410,7 @@ func cmdIndex(args []string) int {
 	fs := flag.NewFlagSet("index", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	common := addCommon(fs)
-	if err := fs.Parse(args[1:]); err != nil {
+	if err := parseArgs(fs, args[1:]); err != nil {
 		return 1
 	}
 	setupLogger(common.logLevel)
@@ -465,7 +465,7 @@ func cmdServe(args []string) int {
 	fs.SetOutput(os.Stderr)
 	common := addCommon(fs)
 	addr := fs.String("addr", envDefault("WALK_ADDR", ":7474"), "listen address")
-	if err := fs.Parse(args); err != nil {
+	if err := parseArgs(fs, args); err != nil {
 		return 1
 	}
 	setupLogger(common.logLevel)
