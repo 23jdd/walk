@@ -14,7 +14,12 @@ type BucketUsage struct {
 
 // BucketKeyCount returns the number of key/value pairs in a bucket.
 func (e *Exec) BucketKeyCount(name string) int {
-	return e.bucket(name).Stats().KeyN
+	c := e.bucket(name).Cursor()
+	n := 0
+	for k, _ := c.First(); k != nil; k, _ = c.Next() {
+		n++
+	}
+	return n
 }
 
 // BucketStats exposes bbolt's physical page statistics.
@@ -22,7 +27,7 @@ func (e *Exec) BucketStats(name string) BucketUsage {
 	st := e.bucket(name).Stats()
 	return BucketUsage{
 		Name:        name,
-		Keys:        st.KeyN,
+		Keys:        e.BucketKeyCount(name),
 		LeafPages:   st.LeafPageN,
 		LeafBytes:   st.LeafInuse,
 		BranchPages: st.BranchPageN,

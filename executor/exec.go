@@ -132,20 +132,27 @@ func (e *Exec) Check() error {
 	return nil
 }
 
-// Emit records one produced solution and enforces limits/timeouts every 1024
-// solutions (F-04).
+// Emit is the cooperative cancellation checkpoint called by operators as they
+// produce candidates. The solution cap itself is enforced at the row/output
+// boundary (Give / top-level drain) so that intermediate operators do not
+// double-count.
 func (e *Exec) Emit() error {
 	if err := e.Check(); err != nil {
 		return err
 	}
 	e.solutions++
-	if e.solutions > e.cfg.MaxSolutions {
+	if e.solutions%1024 == 0 {
+		return e.Check()
+	}
+	return nil
+}
+
+// CheckSolutionCount enforces --max-solutions against final output count.
+func (e *Exec) CheckSolutionCount(n int) error {
+	if n > e.cfg.MaxSolutions {
 		err := fmt.Errorf("%w: limit %d", ErrMaxSolutions, e.cfg.MaxSolutions)
 		e.Fail(err)
 		return err
-	}
-	if e.solutions%1024 == 0 {
-		return e.Check()
 	}
 	return nil
 }

@@ -21,6 +21,9 @@ func verifyName(kind, name string) error {
 	if len(name) > MaxNameBytes {
 		return fmt.Errorf("%s %q exceeds %d bytes", kind, name, MaxNameBytes)
 	}
+	if strings.ContainsRune(name, 0) {
+		return fmt.Errorf("%s must not contain NUL", kind)
+	}
 	return nil
 }
 
