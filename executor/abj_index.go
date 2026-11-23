@@ -1,4 +1,4 @@
-package walk
+package executor
 
 import (
 	"bytes"
@@ -6,12 +6,11 @@ import (
 	"slices"
 
 	"github.com/23jdd/walk/utils"
-	"go.etcd.io/bbolt"
 )
 
-func insertAdjIndex(tx *bbolt.Tx, edge *Edge, relationId uint64) error {
-	out := mustBucket(tx, "adj_out")
-	in := mustBucket(tx, "adj_in")
+func (e *Exec) insertAdjIndex(edge *Edge, relationId uint64) error {
+	out := e.mustBucket("adj_out")
+	in := e.mustBucket("adj_in")
 	from := utob(edge.From)
 	to := utob(edge.To)
 	id := utob(edge.id)
@@ -30,8 +29,8 @@ type ScanResult struct {
 	TypeId uint64
 }
 
-func scanAbjIndexByFrom(tx *bbolt.Tx, from uint64) iter.Seq[ScanResult] {
-	out := mustBucket(tx, "adj_out")
+func (e *Exec) scanAbjIndexByFrom(from uint64) iter.Seq[ScanResult] {
+	out := e.mustBucket("adj_out")
 	cursor := out.Cursor()
 	prefix := utob(from)
 	return func(yield func(ScanResult) bool) {
@@ -44,8 +43,8 @@ func scanAbjIndexByFrom(tx *bbolt.Tx, from uint64) iter.Seq[ScanResult] {
 		}
 	}
 }
-func scanAbjIndexByTo(tx *bbolt.Tx, to uint64) iter.Seq[ScanResult] {
-	out := mustBucket(tx, "adj_in")
+func (e *Exec) scanAbjIndexByTo(to uint64) iter.Seq[ScanResult] {
+	out := e.mustBucket("adj_in")
 	cursor := out.Cursor()
 	prefix := utob(to)
 	return func(yield func(ScanResult) bool) {
@@ -58,8 +57,8 @@ func scanAbjIndexByTo(tx *bbolt.Tx, to uint64) iter.Seq[ScanResult] {
 		}
 	}
 }
-func scanAdjIndexByFromAndType(tx *bbolt.Tx, from uint64, typeId uint64) iter.Seq[ScanResult] {
-	out := mustBucket(tx, "adj_out")
+func (e *Exec) scanAdjIndexByFromAndType(from uint64, typeId uint64) iter.Seq[ScanResult] {
+	out := e.mustBucket("adj_out")
 	cursor := out.Cursor()
 	prefix := slices.Concat(utob(from), utob(typeId))
 	return func(yield func(ScanResult) bool) {
@@ -72,8 +71,8 @@ func scanAdjIndexByFromAndType(tx *bbolt.Tx, from uint64, typeId uint64) iter.Se
 		}
 	}
 }
-func scanAdjIndexByToAndType(tx *bbolt.Tx, to uint64, typeId uint64) iter.Seq[ScanResult] {
-	out := mustBucket(tx, "adj_in")
+func (e *Exec) scanAdjIndexByToAndType(to uint64, typeId uint64) iter.Seq[ScanResult] {
+	out := e.mustBucket("adj_in")
 	cursor := out.Cursor()
 	prefix := slices.Concat(utob(to), utob(typeId))
 	return func(yield func(ScanResult) bool) {
@@ -87,18 +86,18 @@ func scanAdjIndexByToAndType(tx *bbolt.Tx, to uint64, typeId uint64) iter.Seq[Sc
 	}
 }
 
-func haveLinkEdge(tx *bbolt.Tx, id uint64) bool {
-	for _ = range scanAbjIndexByFrom(tx, id) {
+func (e *Exec) haveLinkEdge(id uint64) bool {
+	for _ = range e.scanAbjIndexByFrom(id) {
 		return true
 	}
-	for _ = range scanAbjIndexByTo(tx, id) {
+	for _ = range e.scanAbjIndexByTo(id) {
 		return true
 	}
 	return false
 }
-func allLinkEdge(tx *bbolt.Tx, id uint64) iter.Seq[uint64] {
+func (e *Exec) allLinkEdge(id uint64) iter.Seq[uint64] {
 	return func(yield func(uint64) bool) {
-		for r := range utils.Concat(scanAbjIndexByFrom(tx, id), scanAbjIndexByTo(tx, id)) {
+		for r := range utils.Concat(e.scanAbjIndexByFrom(id), e.scanAbjIndexByTo(id)) {
 			if !yield(r.EdgeId) {
 				return
 			}

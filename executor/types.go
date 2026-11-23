@@ -1,7 +1,6 @@
-package walk
+package executor
 
 import (
-	"bytes"
 	"errors"
 	"strconv"
 )
@@ -34,10 +33,9 @@ func (v Value) MarshalJSON() ([]byte, error) {
 		return nil, ErrUnknownDataType
 	}
 }
-func (v *Value) UnMarshalJson(data []byte) error {
-	if bytes.HasPrefix(data, []byte("null")) {
 
-	}
+// TODO
+func (v *Value) UnMarshalJson(data []byte) error {
 	return nil
 }
 func valueNew(dt DataType, content []byte) Value {

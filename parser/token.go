@@ -2,6 +2,7 @@ package parser
 
 type Token struct {
 	tp     TokenType
+	span   Span
 	source []rune
 }
 
@@ -33,4 +34,14 @@ func WhereToken() Token {
 		tp:     Where,
 		source: []rune("Where"),
 	}
+}
+func IdentifyToken(name []rune) Token {
+	return Token{
+		tp:     Identify,
+		source: name,
+	}
+}
+func (t Token) WithSpan(span Span) Token {
+	t.span = span
+	return t
 }

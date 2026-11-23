@@ -1,4 +1,4 @@
-package walk
+package executor
 
 func verifyNode(n *Node) error {
 	return nil

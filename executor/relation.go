@@ -1,22 +1,20 @@
-package walk
+package executor
 
 import (
 	"errors"
-
-	"go.etcd.io/bbolt"
 )
 
 var ErrRelationNotExists = errors.New("relation  not exists")
 
-func getOrCreateRelationTypes(tx *bbolt.Tx, e *Edge) (uint64, error) {
-	relations := mustBucket(tx, "relation_types")
-	value := relations.Get([]byte(e.Relation))
+func (e *Exec) getOrCreateRelationTypes(edge *Edge) (uint64, error) {
+	relations := e.mustBucket("relation_types")
+	value := relations.Get([]byte(edge.Relation))
 	if value == nil {
 		id, err := relations.NextSequence()
 		if err != nil {
 			return 0, err
 		}
-		err = relations.Put([]byte(e.Relation), utob(id))
+		err = relations.Put([]byte(edge.Relation), utob(id))
 		if err != nil {
 			return 0, err
 		}
@@ -25,8 +23,8 @@ func getOrCreateRelationTypes(tx *bbolt.Tx, e *Edge) (uint64, error) {
 		return btou(value), nil
 	}
 }
-func getRelationTypes(tx *bbolt.Tx, relation string) (uint64, error) {
-	labels := mustBucket(tx, "relation_types")
+func (e *Exec) getRelationTypes(relation string) (uint64, error) {
+	labels := e.mustBucket("relation_types")
 	value := labels.Get([]byte(relation))
 	if value == nil {
 		return 0, ErrLabelNotExists

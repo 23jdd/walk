@@ -4,6 +4,7 @@ import "os"
 
 type Tokenizer struct {
 	sources []rune
+	cursor  int
 }
 
 func TokenizerFromPath(path string) (*Tokenizer, error) {
@@ -14,12 +15,16 @@ func TokenizerFromPath(path string) (*Tokenizer, error) {
 	return &Tokenizer{sources: []rune(string(content))}, nil
 }
 func TokenizerFromString(content string) *Tokenizer {
-	return &Tokenizer{[]rune(content)}
+	return &Tokenizer{sources: []rune(content)}
 }
 
 func (tk *Tokenizer) Next() (Token, error) {
 	return InvalidToken(), nil
 }
+
 func (tk *Tokenizer) Peek() (Token, error) {
-	return InvalidToken(), nil
+	cursor := tk.cursor
+	token, err := tk.Next()
+	tk.cursor = cursor
+	return token, err
 }
