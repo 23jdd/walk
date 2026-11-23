@@ -19,6 +19,7 @@ import (
 
 	"github.com/23jdd/walk"
 	"github.com/23jdd/walk/executor"
+	"github.com/23jdd/walk/internal/httpapi"
 	"github.com/23jdd/walk/parser"
 )
 
@@ -475,7 +476,7 @@ func cmdServe(args []string) int {
 		return 3
 	}
 	defer db.Close()
-	srv := walk.NewServer(db, walk.ServerOptions{
+	srv := httpapi.New(db, httpapi.Options{
 		Timeout:      common.timeout,
 		MaxSolutions: common.maxSolutions,
 		MaxDepth:     common.maxDepth,
