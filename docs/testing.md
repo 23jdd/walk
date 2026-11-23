@@ -13,7 +13,7 @@ All tests run without external services; they use `t.TempDir()` databases.
 | import | `load_test.go` | JSONL/CSV, batching, progress, type inference, duplicate/dangling rejection |
 | query engine | `engine_test.go` | CRUD, WHERE/IS NULL, VarLen, shortest path, aggregation, grouping, ordering, DISTINCT, path values, SET/REMOVE |
 | DB lifecycle | `db_test.go` | hot backup, compact + verification, write rollback, detach delete, stats, concurrent readers/serial writers |
-| HTTP | `server_test.go` | `/query`, `/update`, `/stats`, `/backup`, read-only enforcement |
+| HTTP | `internal/httpapi/server_test.go` | `/query`, `/update`, `/stats`, `/backup`, read-only enforcement, CORS |
 | property-style | `property_test.go` | fixed-seed random CRUD, invariants checked after every op (run with `-race`) |
 | golden/differential | `golden_test.go` + `testdata/golden` | `.cypher` input vs sorted `.tsv` output |
 | benchmarks | `benchmark_test.go` | node create, 1-hop, VarLen, ORDER+LIMIT |

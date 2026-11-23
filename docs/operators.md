@@ -1,8 +1,8 @@
 # Operator Specification and Implementation Details (v1)
 
 This document is the implementation contract for the `walk` executor. It is the
-Markdown form of `docs/算子规格与实现细节.pdf` and is authoritative where it
-conflicts with earlier drafts in `features.md` (notably the `null` ordering rule).
+Markdown form of `docs/算子规格与实现细节.pdf`. Where earlier drafts disagree,
+the decision table in §7 wins (notably the `null` ordering rule).
 
 ## 1. Data model and core contracts
 
