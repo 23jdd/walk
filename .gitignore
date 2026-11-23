@@ -9,4 +9,4 @@
 docs/*.docx
 docs/operator-spec.txt
 /walk
-coverage.out
+coverage*

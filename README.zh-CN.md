@@ -2,6 +2,9 @@
 
 [English](README.md) | **简体中文**
 
+[![CI](https://github.com/23jdd/walk/actions/workflows/ci.yml/badge.svg)](https://github.com/23jdd/walk/actions/workflows/ci.yml)
+[![Release](https://github.com/23jdd/walk/actions/workflows/release.yml/badge.svg)](https://github.com/23jdd/walk/actions/workflows/release.yml)
+
 <p align="center">
   <img src="logo.svg" alt="walk logo" width="128" height="128">
 </p>
