@@ -236,6 +236,7 @@ func (e *Exec) putNode(n *Node, explicit bool) error {
 		return fmt.Errorf("nil node")
 	}
 	cleanNullProps(n.Props)
+	n.Labels = unionStrings(nil, n.Labels...)
 	if err := verifyNode(n); err != nil {
 		return err
 	}

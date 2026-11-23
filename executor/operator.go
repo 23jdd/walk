@@ -27,9 +27,6 @@ func (e *Exec) Find(labels []string, props []PropPred, as string) Stream {
 		}
 		ids := e.findCandidateIDs(labels, props)
 		for id := range ids {
-			if err := e.Emit(); err != nil {
-				return
-			}
 			n, err := e.GetNode(id)
 			if err != nil {
 				e.Fail(err)
@@ -54,6 +51,9 @@ func (e *Exec) Find(labels []string, props []PropPred, as string) Stream {
 			}
 			if !ok {
 				continue
+			}
+			if err := e.Emit(); err != nil {
+				return
 			}
 			sol := Solution{}
 			if as != "" {
