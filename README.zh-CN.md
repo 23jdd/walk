@@ -37,6 +37,25 @@ go build -o walk ./cmd/walk
 Windows 下二进制为 `walk.exe`。默认数据库是 `./graph.db`，可用 `--db`
 参数或环境变量 `WALK_DB` 指定。
 
+## 可视化 Demo
+
+单文件、无需 npm 的演示页面：[demo.html](demo.html)。它从 jsDelivr 加载
+vis-network，通过 HTTP 调用运行中的 walk 服务。
+
+```bash
+go build -o walk ./cmd/walk
+./walk serve --addr=:7474
+
+# 方式 A：直接用浏览器打开 demo.html（file://）
+# 方式 B：不用 npm，起一个静态目录服务
+python -m http.server 8080
+# 然后访问 http://127.0.0.1:8080/demo.html
+```
+
+点击“导入示例数据”即可生成示例图，然后在编辑器中执行查询或写入。HTTP
+服务已发送 CORS 头，因此 `file://` 页面也可以直接访问
+`http://127.0.0.1:7474`。
+
 ## 命令行
 
 ```

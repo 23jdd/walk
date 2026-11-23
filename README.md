@@ -39,6 +39,25 @@ go build -o walk ./cmd/walk
 On Windows the binary is `walk.exe`. The default database is `./graph.db`;
 override it with `--db` or the `WALK_DB` environment variable.
 
+## Demo
+
+A single-file, npm-free demo lives in [demo.html](demo.html). It loads
+vis-network from jsDelivr and talks to the running walk service over HTTP.
+
+```bash
+go build -o walk ./cmd/walk
+./walk serve --addr=:7474
+
+# option A: open demo.html directly (file://)
+# option B: serve this directory without npm
+python -m http.server 8080
+# visit http://127.0.0.1:8080/demo.html
+```
+
+Click “导入示例数据” to seed the graph, then run queries or writes in the
+editor. The server sends CORS headers, so a `file://` page can call
+`http://127.0.0.1:7474` directly.
+
 ## CLI
 
 ```
