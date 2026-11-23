@@ -61,7 +61,13 @@ func (db *DB) Stats(ctx context.Context) (*GraphStats, error) {
 		out.Nodes = e.NodeCount()
 		out.Edges = e.EdgeCount()
 		out.Labels = e.LabelCounts()
+		if len(out.Labels) > 20 {
+			out.Labels = out.Labels[:20]
+		}
 		out.Types = e.TypeCounts()
+		if len(out.Types) > 20 {
+			out.Types = out.Types[:20]
+		}
 		out.Indexes = e.Indexes()
 		out.NodeSeq = e.NodeSequence()
 		out.EdgeSeq = e.EdgeSequence()
@@ -82,15 +88,20 @@ func (db *DB) Stats(ctx context.Context) (*GraphStats, error) {
 	if err != nil {
 		return nil, err
 	}
-	out.Bolt = BoltStats{
-		FreePageN:     db.bolt.Stats().FreePageN,
-		PendingPageN:  db.bolt.Stats().PendingPageN,
-		FreeAlloc:     db.bolt.Stats().FreeAlloc,
-		FreelistInuse: db.bolt.Stats().FreelistInuse,
-		TxN:           db.bolt.Stats().TxN,
-		OpenTxN:       db.bolt.Stats().OpenTxN,
-		TxStats:       db.bolt.Stats().TxStats,
+	db.mu.RLock()
+	if db.bolt != nil {
+		bs := db.bolt.Stats()
+		out.Bolt = BoltStats{
+			FreePageN:     bs.FreePageN,
+			PendingPageN:  bs.PendingPageN,
+			FreeAlloc:     bs.FreeAlloc,
+			FreelistInuse: bs.FreelistInuse,
+			TxN:           bs.TxN,
+			OpenTxN:       bs.OpenTxN,
+			TxStats:       bs.TxStats,
+		}
 	}
+	db.mu.RUnlock()
 	sort.Slice(out.Buckets, func(i, j int) bool { return out.Buckets[i].Name < out.Buckets[j].Name })
 	return out, nil
 }

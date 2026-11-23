@@ -173,6 +173,9 @@ func (db *DB) BackupTo(w io.Writer) error {
 
 // BackupFile writes a hot snapshot to path.
 func (db *DB) BackupFile(path string) error {
+	if err := EnsureDir(path); err != nil {
+		return err
+	}
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
