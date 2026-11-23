@@ -159,6 +159,9 @@ func (e *Exec) Give(in Stream, items []Projection, opt GiveOptions) RowStream {
 		if len(items) == 0 {
 			return
 		}
+		if opt.HasLimit && opt.Limit == 0 {
+			return
+		}
 		if hasAggregate(items) {
 			rows := e.aggregate(in, items)
 			if e.Err() != nil {
@@ -207,14 +210,14 @@ func (e *Exec) Give(in Stream, items []Projection, opt GiveOptions) RowStream {
 				skipped++
 				continue
 			}
-			if opt.HasLimit && emitted >= opt.Limit {
-				return
-			}
 			emitted++
 			if err := e.CheckSolutionCount(emitted); err != nil {
 				return
 			}
 			if !yield(row) {
+				return
+			}
+			if opt.HasLimit && emitted >= opt.Limit {
 				return
 			}
 		}
@@ -283,14 +286,14 @@ func (e *Exec) emitProjected(rows []projectedRow, items []Projection, opt GiveOp
 			skipped++
 			continue
 		}
-		if opt.HasLimit && emitted >= opt.Limit {
-			return
-		}
 		emitted++
 		if err := e.CheckSolutionCount(emitted); err != nil {
 			return
 		}
 		if !yield(pr.row) {
+			return
+		}
+		if opt.HasLimit && emitted >= opt.Limit {
 			return
 		}
 	}

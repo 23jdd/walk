@@ -252,8 +252,8 @@ func TestGiveLimitStopsUpstream(t *testing.T) {
 		if n != 3 {
 			t.Fatalf("rows=%d want 3", n)
 		}
-		if count > 20 {
-			t.Fatalf("upstream was not stopped early: %d", count)
+		if count != 3 {
+			t.Fatalf("upstream should produce exactly 3 rows, got %d", count)
 		}
 	})
 }
