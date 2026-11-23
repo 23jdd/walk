@@ -2,3 +2,11 @@
 *.exe
 *.db
 *.jsonl
+.gocache/
+.gomodcache/
+.tools/
+.tmppdf/
+docs/*.docx
+docs/operator-spec.txt
+gstore
+coverage.out
