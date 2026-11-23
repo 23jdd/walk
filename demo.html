@@ -3,117 +3,193 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>walk · vis-network demo</title>
+<title>历史人物关系图谱 · walk</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/styles/vis-network.min.css">
 <style>
-  :root { --bg:#070d17; --panel:#0c1624; --line:#1e3548; --text:#e6edf3; --muted:#8ba3b8; --green:#34d399; --cyan:#22d3ee; --red:#fb7185; }
+  :root {
+    --ink: #070b10; --ink-2: #0b121a; --panel: #0c141d; --line: #1d2c39;
+    --text: #e9eef3; --muted: #8b9bab; --gold: #d9b45b; --gold-soft: #f4d58d;
+    --jade: #4fd1a5; --seal: #a33a32;
+    --serif: "Noto Serif SC", "Songti SC", "STSong", "SimSun", Georgia, serif;
+    --sans: "Noto Sans SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+  }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   body {
-    margin: 0; color: var(--text); font: 14px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
-    background: radial-gradient(1100px 650px at 12% -10%, rgba(34,211,238,.13), transparent 60%),
-                radial-gradient(900px 600px at 100% 0%, rgba(52,211,153,.10), transparent 55%), var(--bg);
+    margin: 0; color: var(--text); font-family: var(--sans); background:
+      radial-gradient(1100px 620px at 18% -12%, rgba(217, 180, 91, .10), transparent 60%),
+      radial-gradient(900px 600px at 100% 0%, rgba(79, 209, 165, .07), transparent 55%),
+      var(--ink);
+    overflow: hidden;
   }
-  header { display:flex; align-items:center; gap:14px; padding:12px 20px; border-bottom:1px solid var(--line); background:rgba(7,13,23,.82); position:sticky; top:0; z-index:5; }
-  .brand { display:flex; align-items:center; gap:10px; }
-  .brand svg { width:36px; height:36px; }
-  h1 { font-size:17px; margin:0; } h1 span { color:var(--muted); font-weight:500; }
-  .conn { margin-left:auto; display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
-  .dot { width:8px; height:8px; border-radius:50%; background:#fbbf24; box-shadow:0 0 9px #fbbf24; }
-  .dot.ok { background:var(--green); box-shadow:0 0 9px var(--green); }
-  .dot.bad { background:var(--red); box-shadow:0 0 9px var(--red); }
-  #status { color:var(--muted); font-size:12px; }
-  input, textarea, button { font: inherit; }
-  input[type=text] { width:230px; padding:8px 10px; color:var(--text); background:#08111d; border:1px solid var(--line); border-radius:9px; outline:none; }
-  input[type=text]:focus, textarea:focus { border-color:rgba(52,211,153,.7); box-shadow:0 0 0 3px rgba(52,211,153,.10); }
-  button { padding:8px 11px; color:var(--text); background:#122337; border:1px solid var(--line); border-radius:9px; cursor:pointer; white-space:nowrap; }
-  button:hover { background:#163049; border-color:rgba(34,211,238,.55); }
-  button:disabled { opacity:.45; cursor:wait; }
-  button.primary { background:linear-gradient(135deg,#0e7490,#047857); border-color:rgba(52,211,153,.5); }
-  button.danger { color:#fecdd3; background:rgba(251,113,133,.08); border-color:rgba(251,113,133,.35); }
-  main { display:grid; grid-template-columns:minmax(330px,400px) minmax(0,1fr); gap:14px; padding:14px 20px 20px; height:calc(100vh - 61px); }
-  .panel { background:linear-gradient(180deg,rgba(16,31,48,.9),rgba(12,22,36,.96)); border:1px solid var(--line); border-radius:14px; min-height:0; }
-  aside { display:flex; flex-direction:column; gap:11px; padding:13px; overflow:auto; }
-  .label { color:var(--muted); font-size:10.5px; font-weight:700; letter-spacing:.9px; text-transform:uppercase; }
-  .row { display:flex; gap:7px; flex-wrap:wrap; }
-  textarea {
-    width:100%; min-height:112px; resize:vertical; padding:10px; color:#d7fbe8; background:#07101b;
-    border:1px solid var(--line); border-radius:10px; outline:none;
-    font:12.5px/1.55 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  header {
+    display: flex; align-items: center; gap: 16px; padding: 12px 22px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(10, 16, 23, .95), rgba(7, 11, 16, .82));
+    position: relative; z-index: 6;
   }
-  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
-  .stat { padding:8px; background:rgba(7,16,27,.6); border:1px solid var(--line); border-radius:9px; text-align:center; }
-  .stat b { display:block; color:#a7f3d0; font-size:16px; } .stat span { color:var(--muted); font-size:10px; }
-  #summary { display:none; padding:8px 9px; color:#a7f3d0; background:rgba(52,211,153,.07); border:1px solid rgba(52,211,153,.18); border-radius:9px; font:11.5px ui-monospace,Consolas,monospace; }
-  .table { max-height:190px; overflow:auto; border:1px solid var(--line); border-radius:9px; background:#07101b; }
-  table { border-collapse:collapse; width:100%; font-size:11.5px; }
-  th, td { padding:6px 8px; text-align:left; border-bottom:1px solid rgba(30,53,72,.7); vertical-align:top; }
-  th { position:sticky; top:0; background:#0c1a29; color:#9fd8c4; } tr:last-child td { border-bottom:0; }
-  .null { color:#64748b; font-style:italic; } td code { color:#93c5fd; font:10.5px ui-monospace,Consolas,monospace; }
-  .empty { padding:12px; color:var(--muted); font-size:12px; }
-  #log { margin:0; height:110px; overflow:auto; padding:9px; color:#9fb3c7; background:rgba(5,10,18,.6); border:1px solid var(--line); border-radius:9px; font:11px/1.6 ui-monospace,Consolas,monospace; white-space:pre-wrap; }
-  .graph { display:flex; flex-direction:column; min-height:0; overflow:hidden; }
-  .toolbar { display:flex; align-items:center; gap:10px; padding:9px 12px; border-bottom:1px solid var(--line); color:var(--muted); font-size:12px; flex-wrap:wrap; }
-  .toolbar .spacer { flex:1; }
-  #network { flex:1; min-height:420px; }
-  .hint { color:var(--muted); font-size:11.5px; } .hint b { color:#a7f3d0; }
-  #toast { position:fixed; right:16px; bottom:16px; max-width:420px; padding:10px 13px; border-radius:10px; background:#0b1a29; border:1px solid var(--line); color:var(--text); opacity:0; transform:translateY(8px); transition:.18s; pointer-events:none; z-index:20; }
-  #toast.show { opacity:1; transform:translateY(0); } #toast.error { border-color:rgba(251,113,133,.55); }
-  @media (max-width:960px) { main { grid-template-columns:1fr; height:auto; } .graph { min-height:70vh; } header { flex-wrap:wrap; } .conn { margin-left:0; width:100%; } input[type=text] { flex:1; width:auto; } }
+  .brand { display: flex; align-items: center; gap: 12px; flex: none; }
+  .seal {
+    width: 42px; height: 42px; border-radius: 9px; display: grid; place-items: center;
+    color: #f8e9c0; background: linear-gradient(145deg, #b9473d, #7f2823);
+    border: 1px solid rgba(244, 213, 141, .45);
+    box-shadow: 0 6px 18px rgba(163, 58, 50, .35), inset 0 0 0 1px rgba(255, 255, 255, .10);
+    font: 700 21px/1 var(--serif);
+  }
+  .brand h1 { margin: 0; font: 600 20px/1.2 var(--serif); letter-spacing: 2px; }
+  .brand p { margin: 3px 0 0; color: var(--muted); font-size: 10.5px; letter-spacing: 1.4px; text-transform: uppercase; }
+  .search-wrap { position: relative; flex: 1; max-width: 470px; margin-left: 18px; }
+  .search-wrap input {
+    width: 100%; padding: 10px 38px 10px 14px; color: var(--text);
+    background: rgba(8, 15, 23, .92); border: 1px solid var(--line); border-radius: 10px;
+    outline: none; font: 13px var(--sans);
+  }
+  .search-wrap input:focus { border-color: rgba(217, 180, 91, .65); box-shadow: 0 0 0 3px rgba(217, 180, 91, .10); }
+  .search-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 14px; pointer-events: none; }
+  #searchResults {
+    position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 30;
+    display: none; background: #0d1822; border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, .55); overflow: hidden;
+  }
+  #searchResults.show { display: block; }
+  .search-item { display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 9px 12px; border: 0; border-bottom: 1px solid rgba(29, 44, 57, .7); background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+  .search-item:last-child { border-bottom: 0; }
+  .search-item:hover { background: rgba(217, 180, 91, .08); }
+  .search-item b { font-family: var(--serif); font-size: 14px; color: var(--gold-soft); font-weight: 600; }
+  .search-item span { color: var(--muted); font-size: 11.5px; }
+  .header-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; flex: none; }
+  button {
+    font: 12.5px var(--sans); color: var(--text); background: #111d27;
+    border: 1px solid var(--line); border-radius: 9px; padding: 8px 12px; cursor: pointer;
+    white-space: nowrap; transition: .15s ease;
+  }
+  button:hover { border-color: rgba(217, 180, 91, .55); background: #162633; }
+  button.gold { color: #1c1508; background: linear-gradient(135deg, #e8c872, #c89a3f); border-color: rgba(244, 213, 141, .55); font-weight: 700; }
+  button.gold:hover { background: linear-gradient(135deg, #f0d589, #d6a84c); }
+  button.ghost { background: transparent; }
+  button.tiny { padding: 5px 9px; font-size: 11.5px; }
+  .status { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #f0b429; box-shadow: 0 0 8px #f0b429; }
+  .dot.ok { background: var(--jade); box-shadow: 0 0 8px var(--jade); }
+  .dot.bad { background: #f87171; box-shadow: 0 0 8px #f87171; }
+  .filterbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 9px 22px; border-bottom: 1px solid var(--line); background: rgba(8, 13, 19, .72); position: relative; z-index: 5; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line); background: rgba(13, 24, 34, .7); color: var(--muted); cursor: pointer; font-size: 12px; }
+  .chip:hover { color: var(--text); border-color: rgba(217, 180, 91, .4); }
+  .chip.active { color: #1c1508; background: linear-gradient(135deg, #e8c872, #c89a3f); border-color: transparent; font-weight: 700; }
+  select { color: var(--text); background: #0d1822; border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; font: 12px var(--sans); outline: none; }
+  .filter-spacer { flex: 1; }
+  .counter { color: var(--muted); font-size: 11.5px; }
+  .counter b { color: var(--gold-soft); font-weight: 600; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; height: calc(100vh - 108px); }
+  .graph { position: relative; min-width: 0; overflow: hidden; background: radial-gradient(800px 500px at 50% 40%, rgba(27, 50, 62, .30), transparent 70%); }
+  #network { position: absolute; inset: 0; }
+  .graph-toolbar { position: absolute; left: 16px; right: 16px; top: 14px; z-index: 3; display: flex; align-items: center; gap: 8px; pointer-events: none; }
+  .graph-toolbar > * { pointer-events: auto; }
+  .graph-toolbar .spacer { flex: 1; }
+  .legend { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 9px; background: rgba(7, 12, 18, .72); border: 1px solid rgba(29, 44, 57, .8); border-radius: 8px; color: var(--muted); font-size: 10.5px; backdrop-filter: blur(6px); }
+  .legend i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+  .path-banner { position: absolute; left: 50%; top: 58px; transform: translateX(-50%); z-index: 4; display: none; align-items: center; gap: 10px; padding: 8px 12px; background: rgba(10, 18, 26, .94); border: 1px solid rgba(217, 180, 91, .45); border-radius: 999px; box-shadow: 0 12px 32px rgba(0, 0, 0, .4); font-size: 12px; color: var(--gold-soft); max-width: min(760px, calc(100% - 32px)); }
+  .path-banner.show { display: flex; }
+  .path-banner .chain { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .path-banner button { padding: 4px 8px; font-size: 11px; }
+  .empty-state { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; background: radial-gradient(600px 400px at 50% 45%, rgba(12, 22, 31, .96), rgba(7, 11, 16, .98)); padding: 28px; }
+  .empty-card { max-width: 440px; text-align: center; padding: 30px; border: 1px solid rgba(217, 180, 91, .22); border-radius: 18px; background: rgba(10, 17, 24, .8); box-shadow: 0 30px 80px rgba(0, 0, 0, .45); }
+  .empty-card h2 { margin: 0 0 8px; font: 600 25px/1.25 var(--serif); letter-spacing: 3px; color: var(--gold-soft); }
+  .empty-card p { margin: 0 0 20px; color: var(--muted); font-size: 13px; line-height: 1.8; }
+  .empty-card .hint { margin-top: 14px; color: #6f8090; font-size: 11px; }
+  .empty-card code { color: var(--jade); }
+  aside { border-left: 1px solid var(--line); background: linear-gradient(180deg, rgba(11, 19, 27, .96), rgba(7, 12, 18, .98)); overflow: auto; }
+  .detail { padding: 20px 20px 28px; min-height: 100%; }
+  .detail-empty { padding: 30px 8px; color: var(--muted); text-align: center; line-height: 1.9; font-size: 12.5px; }
+  .detail-empty .big { font: 600 20px var(--serif); color: var(--gold-soft); letter-spacing: 2px; margin-bottom: 8px; }
+  .person-head { display: flex; align-items: flex-start; gap: 12px; }
+  .avatar { width: 52px; height: 52px; flex: none; border-radius: 13px; display: grid; place-items: center; font: 600 23px/1 var(--serif); color: #1a1306; background: linear-gradient(145deg, var(--gold-soft), #c89a3f); box-shadow: 0 8px 20px rgba(0, 0, 0, .3); }
+  .person-head h2 { margin: 0; font: 600 25px/1.15 var(--serif); letter-spacing: 2px; }
+  .person-sub { margin: 4px 0 0; color: var(--muted); font-size: 11.5px; }
+  .badge { display: inline-block; padding: 2px 7px; border-radius: 5px; border: 1px solid currentColor; font-size: 10px; letter-spacing: .5px; vertical-align: middle; margin-left: 6px; }
+  .person-meta { display: flex; gap: 14px; flex-wrap: wrap; margin: 16px 0 12px; padding: 10px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); color: var(--muted); font-size: 11.5px; }
+  .person-meta b { color: var(--text); font-weight: 500; }
+  .bio { color: #c6d3dd; font-size: 12.5px; line-height: 1.8; margin: 0 0 16px; }
+  .actions { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 20px; }
+  .section-label { color: var(--gold); font-size: 10px; letter-spacing: 1.6px; text-transform: uppercase; margin: 18px 0 9px; font-weight: 700; }
+  .relations { display: flex; flex-direction: column; gap: 7px; }
+  .relation { display: flex; align-items: flex-start; gap: 9px; width: 100%; padding: 9px 10px; background: rgba(13, 24, 34, .72); border: 1px solid var(--line); border-radius: 10px; color: var(--text); text-align: left; cursor: pointer; transition: .15s; }
+  .relation:hover { border-color: rgba(217, 180, 91, .5); background: rgba(22, 38, 50, .8); }
+  .rel-icon { width: 22px; height: 22px; flex: none; border-radius: 6px; display: grid; place-items: center; font-size: 11px; color: #08110d; font-weight: 800; }
+  .rel-body { min-width: 0; }
+  .rel-line { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+  .rel-line b { font: 600 14px var(--serif); color: var(--gold-soft); }
+  .rel-type { font-size: 10px; color: var(--muted); border: 1px solid var(--line); padding: 1px 5px; border-radius: 4px; }
+  .rel-note { color: #8fa0ae; font-size: 11px; line-height: 1.5; margin-top: 3px; }
+  .graph-footer { position: absolute; left: 16px; bottom: 14px; z-index: 3; display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 10.5px; background: rgba(7, 12, 18, .72); border: 1px solid rgba(29, 44, 57, .8); border-radius: 8px; padding: 6px 9px; }
+  .graph-footer b { color: var(--gold-soft); font-weight: 600; }
+  .graph-footer .spacer { flex: 1; }
+  #toast { position: fixed; right: 18px; bottom: 18px; z-index: 50; max-width: 390px; padding: 10px 13px; border-radius: 10px; color: var(--text); background: #0d1822; border: 1px solid rgba(79, 209, 165, .4); box-shadow: 0 18px 40px rgba(0, 0, 0, .45); opacity: 0; transform: translateY(8px); transition: .18s; pointer-events: none; }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.error { border-color: rgba(248, 113, 113, .55); }
+  .loading { position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; background: rgba(7, 11, 16, .72); color: var(--muted); font-size: 12px; letter-spacing: 1px; }
+  .loading.hidden { display: none; }
+  @media (max-width: 1050px) {
+    main { grid-template-columns: 1fr; grid-template-rows: minmax(58vh, 1fr) auto; height: auto; }
+    aside { border-left: 0; border-top: 1px solid var(--line); max-height: 46vh; }
+    body { overflow: auto; }
+    .search-wrap { order: 5; max-width: none; margin-left: 0; flex-basis: 100%; }
+    header { flex-wrap: wrap; }
+  }
+  @media (max-width: 640px) {
+    .brand h1 { font-size: 17px; }
+    .header-actions .hide-sm { display: none; }
+    .filterbar { padding: 8px 14px; }
+    header { padding: 10px 14px; }
+    .graph-toolbar { left: 10px; right: 10px; top: 10px; }
+    .legend { display: none; }
+  }
 </style>
 </head>
 <body>
 <header>
   <div class="brand">
-    <svg viewBox="0 0 256 256" aria-hidden="true">
-      <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset=".55" stop-color="#34d399"/><stop offset="1" stop-color="#a3e635"/></linearGradient></defs>
-      <rect x="8" y="8" width="240" height="240" rx="58" fill="#0b1220" stroke="#1e3a46" stroke-width="2"/>
-      <path d="M54 82 L98 174 L140 104 L182 174 L218 86" fill="none" stroke="url(#g)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
-      <g fill="#071019" stroke="url(#g)" stroke-width="6"><circle cx="54" cy="82" r="13"/><circle cx="98" cy="174" r="13"/><circle cx="140" cy="104" r="11"/><circle cx="182" cy="174" r="13"/><circle cx="218" cy="86" r="11"/></g>
-      <g fill="#ecfeff"><circle cx="54" cy="82" r="3"/><circle cx="98" cy="174" r="3"/><circle cx="140" cy="104" r="2.6"/><circle cx="182" cy="174" r="3"/><circle cx="218" cy="86" r="2.6"/></g>
-    </svg>
-    <h1>walk <span>graph demo</span></h1>
+    <div class="seal">史</div>
+    <div><h1>历史人物关系图谱</h1><p>Chinese Historical Figures · walk graph</p></div>
   </div>
-  <div class="conn">
-    <i id="dot" class="dot"></i><span id="status">未连接</span>
-    <input id="server" type="text" value="http://127.0.0.1:7474" spellcheck="false" aria-label="walk HTTP 地址">
-    <button id="connect">连接</button>
+  <div class="search-wrap">
+    <input id="search" type="text" placeholder="搜索人物、字号、朝代、事迹…" autocomplete="off" spellcheck="false" aria-label="搜索历史人物">
+    <span class="search-icon">⌕</span>
+    <div id="searchResults"></div>
+  </div>
+  <div class="header-actions">
+    <span class="status"><i id="connDot" class="dot"></i><span id="connText">连接中</span></span>
+    <button id="randomBtn" class="ghost hide-sm">随机人物</button>
+    <button id="fitBtn" class="ghost">重置视图</button>
+    <button id="reloadBtn" class="ghost hide-sm">刷新</button>
   </div>
 </header>
 
-<main>
-  <aside class="panel">
-    <div class="label">操作</div>
-    <div class="row">
-      <button id="seed" class="primary">导入示例数据</button>
-      <button id="refresh">刷新图</button>
-      <button id="fit">适配视图</button>
-      <button id="clear" class="danger">清空</button>
-    </div>
-    <div class="label">Cypher（Ctrl + Enter 执行）</div>
-    <textarea id="cypher" spellcheck="false"></textarea>
-    <div class="row">
-      <button id="query" class="primary">执行查询</button>
-      <button id="write">执行写入</button>
-      <button id="explain">EXPLAIN</button>
-    </div>
-    <div class="hint">查询走 <b>POST /query</b>，写入走 <b>POST /update</b>；图数据由 <b>MATCH (n) RETURN n</b> 和 <b>MATCH ()-[r]-&gt;() RETURN r</b> 通过 HTTP 加载。</div>
-    <div class="stats">
-      <div class="stat"><b id="sNodes">–</b><span>节点</span></div>
-      <div class="stat"><b id="sEdges">–</b><span>关系</span></div>
-      <div class="stat"><b id="sLabels">–</b><span>标签</span></div>
-      <div class="stat"><b id="sTypes">–</b><span>类型</span></div>
-    </div>
-    <div id="summary"></div>
-    <div class="label">结果 <span id="meta" class="hint"></span></div>
-    <div class="table" id="result"><div class="empty">点击“导入示例数据”开始。</div></div>
-    <pre id="log">[demo] 等待连接 walk 服务…</pre>
-  </aside>
+<div class="filterbar">
+  <div class="chips" id="dynastyChips"></div>
+  <div class="filter-spacer"></div>
+  <select id="relFilter" aria-label="关系类型"><option value="全部">全部关系</option></select>
+  <span class="counter" id="counter"></span>
+</div>
 
-  <section class="panel graph">
-    <div class="toolbar"><span id="graphMeta">0 nodes · 0 edges</span><span class="spacer"></span><label class="hint"><input type="checkbox" id="physics" checked> 物理布局</label></div>
+<main>
+  <section class="graph">
     <div id="network"></div>
+    <div class="graph-toolbar"><div class="legend" id="legend"></div><span class="spacer"></span></div>
+    <div class="path-banner" id="pathBanner"></div>
+    <div class="graph-footer"><span>可见 <b id="visiblePeople">0</b> 人物 · <b id="visibleLinks">0</b> 关系</span><span class="spacer"></span><span>点击人物查看详情 · 双击聚焦</span></div>
+    <div class="empty-state" id="emptyState">
+      <div class="empty-card">
+        <h2>一图看尽千年人物</h2>
+        <p>从春秋诸子到南宋忠臣，沿着师承、君臣、盟友与思想传承，探索中国历史人物之间的关系网络。</p>
+        <button id="seedBtn" class="gold">载入示例人物图谱</button>
+        <div class="hint" id="emptyHint">需要先启动 <code>walk serve --addr=:7474</code></div>
+      </div>
+    </div>
+    <div class="loading hidden" id="loading">正在读取图谱…</div>
   </section>
+  <aside><div class="detail" id="detail"><div class="detail-empty"><div class="big">人物 · 关系</div>点击左侧人物，查看朝代、生平与关系。<br>可用上方朝代筛选、搜索或“随机人物”开始探索。</div></div></aside>
 </main>
 <div id="toast"></div>
 
@@ -122,207 +198,418 @@
 (() => {
   'use strict';
   const $ = (id) => document.getElementById(id);
-  const DEFAULT_QUERY = `MATCH (n:Person)\nRETURN n.name AS name, n.age AS age\nORDER BY age`;
-  const SEED = `CREATE (a:Person {name: "Alice", age: 39, city: "Paris"}),
-       (b:Person {name: "Bob", age: 27, city: "Berlin"}),
-       (c:Person {name: "Carol", age: 34, city: "Paris"}),
-       (d:Project {name: "walk", stars: 128}),
-       (e:Project {name: "bbolt", stars: 512}),
-       (a)-[:KNOWS {since: 2020}]->(b),
-       (b)-[:KNOWS {since: 2022}]->(c),
-       (a)-[:WORKS_ON {role: "maintainer"}]->(d),
-       (c)-[:WORKS_ON {role: "designer"}]->(d),
-       (d)-[:DEPENDS_ON]->(e)`;
+  const API = new URLSearchParams(location.search).get('api') || 'http://127.0.0.1:7474';
+  const DYNASTY_ORDER = ['春秋', '战国', '秦', '西汉', '三国', '唐', '宋'];
+  const DYNASTY_COLORS = { '春秋': '#d9b45b', '战国': '#e08a3c', '秦': '#d95c5c', '西汉': '#5b8ee8', '三国': '#9b7bf0', '唐': '#e56aa6', '宋': '#46c39a' };
+  const REL_LABELS = { INFLUENCED: '思想传承', TEACHER: '师承', RULER: '君臣', ALLY: '盟友', ENEMY: '敌对', FAMILY: '亲族', FRIEND: '友人', LEARNED: '问学', SERVED: '效力', RIVAL: '政见相左' };
+  const REL_COLORS = { INFLUENCED: '#a3e635', TEACHER: '#f0b429', RULER: '#60a5fa', ALLY: '#34d399', ENEMY: '#fb7185', FAMILY: '#c084fc', FRIEND: '#22d3ee', LEARNED: '#fbbf24', SERVED: '#94a3b8', RIVAL: '#f472b6' };
 
-  const state = { network: null, nodes: null, edges: null, busy: false };
+  const SEED = `CREATE
+    (p1:Person {name: "孔子", zi: "仲尼", dynasty: "春秋", born: -551, died: -479, title: "至圣先师", bio: "儒家学派创始人，主张仁与礼，周游列国，整理六经。"}),
+    (p2:Person {name: "老子", zi: "聃", dynasty: "春秋", born: -571, died: -471, title: "道家始祖", bio: "著《道德经》，主张道法自然、无为而治。"}),
+    (p3:Person {name: "孟子", zi: "轲", dynasty: "战国", born: -372, died: -289, title: "亚圣", bio: "发展仁政与性善论，提出民贵君轻。"}),
+    (p4:Person {name: "荀子", zi: "况", dynasty: "战国", born: -313, died: -238, title: "儒家宗师", bio: "主张性恶论与礼法并用，弟子韩非、李斯。"}),
+    (p5:Person {name: "庄子", zi: "周", dynasty: "战国", born: -369, died: -286, title: "南华真人", bio: "以寓言阐发逍遥与齐物，继承老子之道。"}),
+    (p6:Person {name: "韩非", zi: "非", dynasty: "战国", born: -280, died: -233, title: "法家集大成者", bio: "综合法术势，著《韩非子》，影响秦制。"}),
+    (p7:Person {name: "李斯", zi: "通古", dynasty: "秦", born: -284, died: -208, title: "秦朝丞相", bio: "辅佐秦始皇统一文字与度量衡，后为赵高所害。"}),
+    (p8:Person {name: "秦始皇", zi: "政", dynasty: "秦", born: -259, died: -210, title: "始皇帝", bio: "统一六国，建立中央集权与郡县制。"}),
+    (p9:Person {name: "项羽", zi: "羽", dynasty: "秦", born: -232, died: -202, title: "西楚霸王", bio: "巨鹿破秦，勇冠三军，楚汉相争败于垓下。"}),
+    (p10:Person {name: "刘邦", zi: "邦", dynasty: "西汉", born: -256, died: -195, title: "汉高祖", bio: "建立汉朝，约法三章，休养生息。"}),
+    (p11:Person {name: "张良", zi: "子房", dynasty: "西汉", born: -250, died: -186, title: "留侯", bio: "运筹帷幄之中，决胜千里之外，汉初三杰。"}),
+    (p12:Person {name: "韩信", zi: "信", dynasty: "西汉", born: -231, died: -196, title: "淮阴侯", bio: "汉初名将，连百万之军，战必胜，攻必取。"}),
+    (p13:Person {name: "司马迁", zi: "子长", dynasty: "西汉", born: -145, died: -86, title: "太史公", bio: "忍辱负重，著《史记》，究天人之际。"}),
+    (p14:Person {name: "汉武帝", zi: "彻", dynasty: "西汉", born: -156, died: -87, title: "汉武大帝", bio: "罢黜百家，独尊儒术，开疆拓土。"}),
+    (p15:Person {name: "卫青", zi: "仲卿", dynasty: "西汉", born: -155, died: -106, title: "大将军", bio: "七战匈奴，收复河朔，沉稳谦逊。"}),
+    (p16:Person {name: "霍去病", zi: "去病", dynasty: "西汉", born: -140, died: -117, title: "冠军侯", bio: "封狼居胥，匈奴未灭，何以家为。"}),
+    (p17:Person {name: "王昭君", zi: "嫱", dynasty: "西汉", born: -54, died: 19, title: "明妃", bio: "出塞和亲，换得汉匈数十年和平。"}),
+    (p18:Person {name: "刘备", zi: "玄德", dynasty: "三国", born: 161, died: 223, title: "昭烈帝", bio: "三顾茅庐，建立蜀汉，以仁德著称。"}),
+    (p19:Person {name: "关羽", zi: "云长", dynasty: "三国", born: 160, died: 220, title: "武圣", bio: "忠义千秋，水淹七军，威震华夏。"}),
+    (p20:Person {name: "张飞", zi: "翼德", dynasty: "三国", born: 165, died: 221, title: "桓侯", bio: "当阳桥喝退曹军，勇猛粗豪。"}),
+    (p21:Person {name: "诸葛亮", zi: "孔明", dynasty: "三国", born: 181, died: 234, title: "卧龙", bio: "隆中对定三分，鞠躬尽瘁，死而后已。"}),
+    (p22:Person {name: "曹操", zi: "孟德", dynasty: "三国", born: 155, died: 220, title: "魏武帝", bio: "挟天子以令诸侯，横槊赋诗，雄才大略。"}),
+    (p23:Person {name: "孙权", zi: "仲谋", dynasty: "三国", born: 182, died: 252, title: "吴大帝", bio: "坐断东南，赤壁抗曹，建立东吴。"}),
+    (p24:Person {name: "周瑜", zi: "公瑾", dynasty: "三国", born: 175, died: 210, title: "大都督", bio: "赤壁火攻破曹，儒将风流，英年早逝。"}),
+    (p25:Person {name: "司马懿", zi: "仲达", dynasty: "三国", born: 179, died: 251, title: "宣皇帝", bio: "隐忍蓄势，高平陵之变奠定晋代基业。"}),
+    (p26:Person {name: "李白", zi: "太白", dynasty: "唐", born: 701, died: 762, title: "诗仙", bio: "斗酒诗百篇，飘逸豪放，盛唐气象。"}),
+    (p27:Person {name: "杜甫", zi: "子美", dynasty: "唐", born: 712, died: 770, title: "诗圣", bio: "沉郁顿挫，忧国忧民，诗史之誉。"}),
+    (p28:Person {name: "苏轼", zi: "子瞻", dynasty: "宋", born: 1037, died: 1101, title: "东坡居士", bio: "豪放词宗，旷达人生，诗文书画皆绝。"}),
+    (p29:Person {name: "王安石", zi: "介甫", dynasty: "宋", born: 1021, died: 1086, title: "临川先生", bio: "熙宁变法，拗相公，改革与争议并存。"}),
+    (p30:Person {name: "岳飞", zi: "鹏举", dynasty: "宋", born: 1103, died: 1142, title: "武穆", bio: "精忠报国，郾城大捷，风波亭冤案。"}),
+    (p31:Person {name: "文天祥", zi: "宋瑞", dynasty: "宋", born: 1236, died: 1283, title: "文忠", bio: "人生自古谁无死，留取丹心照汗青。"}),
+    (p1)-[:INFLUENCED {note: "孟子私淑孔子，发展仁政学说"}]->(p3),
+    (p1)-[:INFLUENCED {note: "荀子尊崇孔子，主张礼法并用"}]->(p4),
+    (p2)-[:INFLUENCED {note: "庄子继承并发展老子之道"}]->(p5),
+    (p1)-[:LEARNED {note: "孔子适周，问礼于老子"}]->(p2),
+    (p4)-[:TEACHER {note: "韩非师从荀子"}]->(p6),
+    (p4)-[:TEACHER {note: "李斯与韩非同师荀子"}]->(p7),
+    (p6)-[:INFLUENCED {note: "秦王政读《韩非子》而叹服"}]->(p8),
+    (p8)-[:RULER {note: "李斯任秦朝丞相"}]->(p7),
+    (p8)-[:ENEMY {note: "秦末起义，项羽破釜沉舟"}]->(p9),
+    (p9)-[:ENEMY {note: "楚汉相争，鸿门宴与垓下"}]->(p10),
+    (p10)-[:RULER {note: "张良为汉高祖谋臣"}]->(p11),
+    (p10)-[:RULER {note: "韩信拜为大将"}]->(p12),
+    (p11)-[:ALLY {note: "汉初三杰，共辅高祖"}]->(p12),
+    (p13)-[:SERVED {note: "司马迁任太史令，著《史记》"}]->(p14),
+    (p14)-[:RULER {note: "卫青拜大将军"}]->(p15),
+    (p15)-[:FAMILY {note: "卫青是霍去病舅父"}]->(p16),
+    (p14)-[:RULER {note: "霍去病封冠军侯"}]->(p16),
+    (p14)-[:RULER {note: "昭君出塞和亲"}]->(p17),
+    (p18)-[:ALLY {note: "桃园结义，情同兄弟"}]->(p19),
+    (p18)-[:ALLY {note: "桃园结义，情同兄弟"}]->(p20),
+    (p18)-[:RULER {note: "三顾茅庐，请诸葛亮出山"}]->(p21),
+    (p19)-[:ALLY {note: "关羽与张飞情同兄弟"}]->(p20),
+    (p22)-[:ENEMY {note: "煮酒论英雄，汉中之争"}]->(p18),
+    (p22)-[:ENEMY {note: "赤壁之战，曹操败于孙刘联军"}]->(p23),
+    (p23)-[:ALLY {note: "孙刘联盟共抗曹操"}]->(p18),
+    (p23)-[:RULER {note: "周瑜任东吴大都督"}]->(p24),
+    (p21)-[:ALLY {note: "赤壁联手破曹"}]->(p24),
+    (p21)-[:ENEMY {note: "北伐与司马懿对峙"}]->(p25),
+    (p22)-[:RULER {note: "司马懿为魏国重臣"}]->(p25),
+    (p26)-[:FRIEND {note: "李杜之交，同游梁宋"}]->(p27),
+    (p28)-[:RIVAL {note: "王安石变法，苏轼反对新法"}]->(p29),
+    (p18)-[:FAMILY {note: "刘备自称汉景帝之后，汉室宗亲"}]->(p10),
+    (p27)-[:INFLUENCED {note: "杜甫《蜀相》追怀诸葛亮"}]->(p21),
+    (p26)-[:INFLUENCED {note: "李白诗咏秦皇汉武"}]->(p8),
+    (p28)-[:INFLUENCED {note: "苏轼推崇杜甫诗风"}]->(p27),
+    (p29)-[:INFLUENCED {note: "王安石编《杜工部诗后集》"}]->(p27),
+    (p31)-[:INFLUENCED {note: "文天祥《正气歌》咏诸葛亮"}]->(p21),
+    (p30)-[:INFLUENCED {note: "文天祥以岳飞为榜样，忠义气节"}]->(p31)`;
+
+  const state = { people: new Map(), links: [], selected: null, query: '', dynasty: '全部', relType: '全部', pathStart: null, pathNodes: new Set(), pathEdges: new Set(), pathInfo: null, nodesDS: null, edgesDS: null, network: null, loaded: false, firstFit: false };
+
   if (!window.vis || !vis.Network || !vis.DataSet) {
-    $('log').textContent = '[demo] vis-network 加载失败：请检查 cdn.jsdelivr.net 是否可访问。';
+    showToast('vis-network 加载失败，请检查 cdn.jsdelivr.net 是否可访问。', true);
     return;
   }
-  state.nodes = new vis.DataSet([]);
-  state.edges = new vis.DataSet([]);
-
-  const palette = ['#22d3ee','#34d399','#a3e635','#fbbf24','#fb7185','#c084fc','#60a5fa','#f472b6'];
-  const colors = new Map();
-  function colorFor(label) {
-    if (!colors.has(label)) {
-      let h = 0; for (let i = 0; i < label.length; i++) h = (h * 31 + label.charCodeAt(i)) >>> 0;
-      colors.set(label, palette[h % palette.length]);
-    }
-    return colors.get(label);
-  }
-  const base = () => ($('server').value || '').trim().replace(/\/+$/, '');
-  const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  state.nodesDS = new vis.DataSet([]);
+  state.edgesDS = new vis.DataSet([]);
 
   async function api(path, method = 'GET', body = null) {
-    const url = base() + path;
     const opt = { method, mode: 'cors', headers: {} };
     if (body !== null) { opt.headers['Content-Type'] = 'text/plain;charset=UTF-8'; opt.body = body; }
     let res;
-    try { res = await fetch(url, opt); }
-    catch (e) { throw new Error(`无法连接 ${url}。请先运行 walk serve --addr=:7474，并确认 CORS。原始错误：${e.message}`); }
+    try { res = await fetch(API + path, opt); }
+    catch (e) { throw new Error(`无法连接 ${API}。请先运行 walk serve --addr=:7474。`); }
     const text = await res.text();
     let data; try { data = text ? JSON.parse(text) : null; } catch { data = { error: text }; }
     if (!res.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
     return data;
   }
-
-  function toast(msg, error = false) {
+  function showToast(msg, error = false) {
     const el = $('toast'); el.textContent = msg; el.classList.toggle('error', error); el.classList.add('show');
-    clearTimeout(toast.timer); toast.timer = setTimeout(() => el.classList.remove('show'), 3600);
+    clearTimeout(showToast.timer); showToast.timer = setTimeout(() => el.classList.remove('show'), 3600);
   }
-  function log(msg) {
-    const el = $('log'); el.textContent += `\n[${new Date().toLocaleTimeString()}] ${msg}`;
-    el.scrollTop = el.scrollHeight;
-  }
-  function conn(ok, msg) { $('dot').className = 'dot ' + (ok ? 'ok' : 'bad'); $('status').textContent = msg; }
-
-  function renderTable(res) {
-    const box = $('result'), meta = $('meta');
-    if (!res || !res.columns || !res.columns.length) {
-      box.innerHTML = '<div class="empty">没有列；写入语句通常只返回 summary。</div>';
-      meta.textContent = res && res.summary ? 'summary' : '';
-      return;
-    }
-    const rows = res.rows || [];
-    meta.textContent = `${rows.length} 行`;
-    const head = res.columns.map((c) => `<th>${esc(c)}</th>`).join('');
-    const body = rows.slice(0, 500).map((r) => `<tr>${r.map((v) => `<td>${fmt(v)}</td>`).join('')}</tr>`).join('');
-    box.innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body || `<tr><td colspan="${res.columns.length}"><span class="null">0 rows</span></td></tr>`}</tbody></table>`;
-  }
-  function fmt(v) {
-    if (v === null || v === undefined) return '<span class="null">null</span>';
-    if (typeof v === 'object') return `<code>${esc(JSON.stringify(v))}</code>`;
-    return esc(v);
-  }
-  function renderSummary(res) {
-    const box = $('summary');
-    if (!res || !res.summary) { box.style.display = 'none'; return; }
-    const text = Object.entries(res.summary).filter(([, v]) => v !== 0).map(([k, v]) => `${k}=${v}`).join('  ');
-    box.textContent = text || 'no changes'; box.style.display = 'block';
-  }
-
-  function addNode(n) {
-    if (!n || n.id === undefined || n.id === null) return;
-    const labels = Array.isArray(n.labels) ? n.labels : [];
-    const primary = labels[0] || 'Node';
-    const title = (n.props && (n.props.name || n.props.title)) || '';
-    state.nodes.update({
-      id: String(n.id), label: `${primary}\n${title}`,
-      title: `<b>Node ${esc(n.id)}</b><br>${esc(labels.join(': '))}<br><code>${esc(JSON.stringify(n.props || {}))}</code>`,
-      color: { background: colorFor(primary), border: '#e6edf3', highlight: { background: '#fbbf24', border: '#fff' } },
-      font: { color: '#071019', size: 12 }, shape: 'dot', size: 22, borderWidth: 2
-    });
-  }
-  function addEdge(e) {
-    if (!e || e.id === undefined) return;
-    state.edges.update({
-      id: 'e' + e.id, from: String(e.from), to: String(e.to), label: e.type || '',
-      title: `<b>Edge ${esc(e.id)}</b> · ${esc(e.type || '')}<br><code>${esc(JSON.stringify(e.props || {}))}</code>`,
-      arrows: 'to', color: { color: '#22d3ee', highlight: '#fbbf24' },
-      font: { color: '#a7f3d0', size: 10 }, smooth: { enabled: true, type: 'dynamic' }
-    });
-  }
-  function ensureNode(id) { if (!state.nodes.get(String(id))) addNode({ id, labels: ['?'], props: {} }); }
-  function refreshView() {
-    $('graphMeta').textContent = `${state.nodes.length} nodes · ${state.edges.length} edges`;
-    state.network.setData({ nodes: state.nodes, edges: state.edges });
-    state.network.fit({ animation: { duration: 400 } });
-  }
-
-  async function loadGraph() {
-    const [nr, er] = await Promise.all([
-      api('/query', 'POST', 'MATCH (n) RETURN n'),
-      api('/query', 'POST', 'MATCH (a)-[r]->(b) RETURN r')
-    ]);
-    state.nodes.clear(); state.edges.clear();
-    (nr.rows || []).forEach((r) => r[0] && addNode(r[0]));
-    (er.rows || []).forEach((r) => { const e = r[0]; if (!e) return; ensureNode(e.from); ensureNode(e.to); addEdge(e); });
-    refreshView(); log(`图已刷新：${state.nodes.length} nodes / ${state.edges.length} edges`);
-  }
-  async function loadStats() {
-    const s = await api('/stats');
-    $('sNodes').textContent = s.nodes ?? '–'; $('sEdges').textContent = s.edges ?? '–';
-    $('sLabels').textContent = (s.labels || []).length; $('sTypes').textContent = (s.types || []).length;
-  }
-  async function connect() {
-    try {
-      await api('/health'); conn(true, '已连接'); log('已连接 ' + base());
-      await Promise.all([loadGraph(), loadStats()]);
-    } catch (e) { conn(false, '连接失败'); log(e.message); toast(e.message, true); }
-  }
-
-  async function run(kind) {
-    if (state.busy) return;
-    const cypher = $('cypher').value.trim();
-    if (!cypher) return toast('请输入 Cypher', true);
-    state.busy = true;
-    ['query','write','explain','seed','refresh','clear'].forEach((id) => $(id).disabled = true);
-    const t0 = performance.now();
-    try {
-      let res;
-      if (kind === 'explain') {
-        res = await api('/query', 'POST', 'EXPLAIN ' + cypher.replace(/^EXPLAIN\s+/i, ''));
-        renderTable(res); renderSummary(null);
-      } else {
-        res = await api(kind === 'write' ? '/update' : '/query', 'POST', cypher);
-        renderTable(res); renderSummary(res);
-        if (kind === 'write' || hasGraph(res)) await Promise.all([loadGraph(), loadStats()]);
-      }
-      log(`${kind === 'explain' ? 'EXPLAIN' : kind === 'write' ? '写入' : '查询'}完成 (${Math.round(performance.now() - t0)}ms)`);
-    } catch (e) {
-      log('错误: ' + e.message); toast(e.message, true); renderSummary(null);
-      $('result').innerHTML = `<div class="empty" style="color:#fecdd3">${esc(e.message)}</div>`;
-    } finally {
-      state.busy = false;
-      ['query','write','explain','seed','refresh','clear'].forEach((id) => $(id).disabled = false);
-    }
-  }
-  function hasGraph(res) {
-    for (const row of res.rows || []) for (const cell of row) {
-      if (cell && typeof cell === 'object' && (Array.isArray(cell.labels) || (cell.from !== undefined && cell.to !== undefined) || Array.isArray(cell.nodes))) return true;
-    }
-    return false;
-  }
-  async function seed() {
-    if (state.busy) return;
-    state.busy = true;
-    try { await api('/update', 'POST', SEED); toast('示例数据已创建'); await Promise.all([loadGraph(), loadStats()]); }
-    catch (e) { toast(e.message, true); log('导入失败: ' + e.message); }
-    finally { state.busy = false; }
-  }
-  async function clearAll() {
-    if (!confirm('确定删除所有节点和关系？')) return;
-    try { await api('/update', 'POST', 'MATCH (n) DETACH DELETE n'); toast('已清空'); await Promise.all([loadGraph(), loadStats()]); }
-    catch (e) { toast(e.message, true); }
-  }
+  function setConn(ok, text) { $('connDot').className = 'dot ' + (ok ? 'ok' : 'bad'); $('connText').textContent = text; }
+  function esc(v) { return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  function year(v) { if (v === null || v === undefined) return '?'; return v < 0 ? `前${-v}` : `${v}`; }
+  function dynastyColor(d) { return DYNASTY_COLORS[d] || '#8b9bab'; }
+  function relLabel(t) { return REL_LABELS[t] || t; }
+  function relColor(t) { return REL_COLORS[t] || '#64809a'; }
 
   function initNetwork() {
-    state.network = new vis.Network($('network'), { nodes: state.nodes, edges: state.edges }, {
+    state.network = new vis.Network($('network'), { nodes: state.nodesDS, edges: state.edgesDS }, {
       autoResize: true,
-      physics: { enabled: true, stabilization: { iterations: 200 }, barnesHut: { gravitationalConstant: -8000, springLength: 150 } },
-      interaction: { hover: true, multiselect: true },
-      layout: { improvedLayout: true }
+      physics: { enabled: true, stabilization: { enabled: true, iterations: 260, updateInterval: 25 }, barnesHut: { gravitationalConstant: -11000, springLength: 170, springConstant: 0.035, damping: 0.14 } },
+      interaction: { hover: true, tooltipDelay: 120, multiselect: false, navigationButtons: false },
+      nodes: { chosen: true, shadow: { enabled: true, color: 'rgba(0,0,0,.45)', size: 12, x: 0, y: 3 } },
+      edges: { chosen: true, selectionWidth: 2 },
+      layout: { improvedLayout: true },
     });
-    state.network.on('click', (p) => {
-      if (p.nodes.length) { const n = state.nodes.get(p.nodes[0]); if (n) $('cypher').value = `MATCH (n) WHERE id(n) = ${n.id} RETURN n`; }
+    state.network.on('click', (params) => {
+      if (params.nodes.length) onPersonClick(String(params.nodes[0]));
+      else if (!params.edges.length) clearSelection();
     });
-    $('physics').addEventListener('change', (e) => state.network.setOptions({ physics: { enabled: e.target.checked } }));
+    state.network.on('doubleClick', (params) => { if (params.nodes.length) state.network.focus(params.nodes[0], { scale: 1.35, animation: true }); });
+    state.network.on('stabilizationIterationsDone', () => { if (!state.firstFit) { state.network.fit({ animation: { duration: 600 } }); state.firstFit = true; } });
   }
 
-  $('cypher').value = DEFAULT_QUERY;
-  initNetwork();
-  $('connect').onclick = connect;
-  $('seed').onclick = seed;
-  $('refresh').onclick = () => Promise.all([loadGraph(), loadStats()]).catch((e) => toast(e.message, true));
-  $('fit').onclick = () => state.network.fit({ animation: true });
-  $('clear').onclick = clearAll;
-  $('query').onclick = () => run('query');
-  $('write').onclick = () => run('write');
-  $('explain').onclick = () => run('explain');
-  $('server').onchange = connect;
-  $('cypher').addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); run('query'); } });
-  connect();
+  async function load() {
+    $('loading').classList.remove('hidden');
+    try {
+      const [nodesRes, edgesRes] = await Promise.all([
+        api('/query', 'POST', 'MATCH (n:Person) RETURN n'),
+        api('/query', 'POST', 'MATCH (a:Person)-[r]->(b:Person) RETURN r'),
+      ]);
+      state.people.clear(); state.links = [];
+      for (const row of nodesRes.rows || []) { const n = row[0]; if (n && n.id !== undefined) state.people.set(String(n.id), n); }
+      for (const row of edgesRes.rows || []) {
+        const e = row[0];
+        if (!e || e.id === undefined) continue;
+        if (!state.people.has(String(e.from)) || !state.people.has(String(e.to))) continue;
+        state.links.push({ id: 'e' + e.id, edgeId: String(e.id), from: String(e.from), to: String(e.to), type: e.type || 'RELATED', props: e.props || {} });
+      }
+      setConn(true, '已连接');
+      $('emptyState').style.display = 'none';
+      state.loaded = true; state.firstFit = false;
+      renderFilters(); renderGraph();
+      if (!state.people.size) showEmpty('数据库中还没有历史人物。', '载入示例人物图谱');
+    } catch (err) {
+      setConn(false, '连接失败');
+      showEmpty(err.message, '重新连接');
+    } finally {
+      $('loading').classList.add('hidden');
+    }
+  }
+
+  function showEmpty(message, buttonLabel) {
+    const empty = $('emptyState'); empty.style.display = 'grid';
+    const card = empty.querySelector('.empty-card');
+    let p = card.querySelector('.error-text');
+    if (!p) { p = document.createElement('p'); p.className = 'error-text'; card.insertBefore(p, card.querySelector('#seedBtn')); }
+    p.textContent = message; p.style.color = '#fca5a5';
+    $('seedBtn').textContent = buttonLabel;
+    $('seedBtn').onclick = buttonLabel === '重新连接' ? boot : seed;
+    $('emptyHint').innerHTML = '需要先启动 <code>walk serve --addr=:7474</code>';
+  }
+
+  function renderFilters() {
+    const dynasties = DYNASTY_ORDER.filter((d) => [...state.people.values()].some((p) => p.props && p.props.dynasty === d));
+    $('dynastyChips').innerHTML = ['全部', ...dynasties].map((d) => `<button class="chip ${state.dynasty === d ? 'active' : ''}" data-dynasty="${esc(d)}">${esc(d)}</button>`).join('');
+    $('dynastyChips').querySelectorAll('.chip').forEach((btn) => { btn.onclick = () => { state.dynasty = btn.dataset.dynasty; renderFilters(); renderGraph(); }; });
+    const types = [...new Set(state.links.map((l) => l.type))].sort((a, b) => relLabel(a).localeCompare(relLabel(b), 'zh'));
+    const current = state.relType;
+    $('relFilter').innerHTML = `<option value="全部">全部关系</option>` + types.map((t) => `<option value="${esc(t)}">${esc(relLabel(t))} (${state.links.filter((l) => l.type === t).length})</option>`).join('');
+    $('relFilter').value = types.includes(current) || current === '全部' ? current : '全部';
+    state.relType = $('relFilter').value;
+    $('relFilter').onchange = (e) => { state.relType = e.target.value; renderGraph(); };
+    $('legend').innerHTML = dynasties.map((d) => `<span><i style="background:${dynastyColor(d)}"></i>${esc(d)}</span>`).join('');
+    $('counter').innerHTML = `<b>${state.people.size}</b> 人物 · <b>${state.links.length}</b> 关系`;
+  }
+
+  function searchMatches() {
+    const q = state.query.trim().toLowerCase();
+    if (!q) return null;
+    const set = new Set();
+    for (const [id, p] of state.people) {
+      const props = p.props || {};
+      const hay = [props.name, props.zi, props.dynasty, props.title, props.bio, p.labels || []].flat().join(' ').toLowerCase();
+      if (hay.includes(q)) set.add(id);
+    }
+    return set;
+  }
+  function visiblePeople() { return [...state.people.values()].filter((p) => state.dynasty === '全部' || (p.props && p.props.dynasty === state.dynasty)); }
+  function neighborSet(id) {
+    const set = new Set();
+    for (const l of state.links) { if (l.from === id) set.add(l.to); if (l.to === id) set.add(l.from); }
+    return set;
+  }
+
+  function renderGraph() {
+    const visible = new Map(visiblePeople().map((p) => [String(p.id), p]));
+    const matches = searchMatches();
+    const neighbors = state.selected ? neighborSet(state.selected) : new Set();
+    const hasPath = state.pathNodes.size > 0;
+    const degrees = new Map();
+    for (const l of state.links) { degrees.set(l.from, (degrees.get(l.from) || 0) + 1); degrees.set(l.to, (degrees.get(l.to) || 0) + 1); }
+    const nodes = [];
+    for (const [id, p] of visible) {
+      const props = p.props || {};
+      const d = props.dynasty || '其他';
+      const dim = (matches && !matches.has(id)) || (hasPath && !state.pathNodes.has(id)) || (state.selected && id !== state.selected && !neighbors.has(id));
+      const onPath = state.pathNodes.has(id), selected = state.selected === id;
+      const background = onPath ? '#f2cf76' : dim ? '#1a2733' : dynastyColor(d);
+      nodes.push({
+        id, label: props.name || '人物',
+        title: `<b>${esc(props.name || '')}</b>${props.zi ? ' · 字' + esc(props.zi) : ''}<br>${esc(d)} · ${year(props.born)}—${year(props.died)}<br>${esc(props.title || '')}<br><span style="color:#a9bac7">${esc(props.bio || '')}</span>`,
+        shape: 'dot', size: 18 + Math.min(14, (degrees.get(id) || 0) * 2),
+        color: { background, border: selected ? '#f8fafc' : onPath ? '#fde68a' : 'rgba(244,213,141,.40)', highlight: { background: '#f2cf76', border: '#fff8e1' }, hover: { background: dim ? '#2a3a49' : dynastyColor(d), border: '#f4d58d' } },
+        borderWidth: selected ? 4 : onPath ? 3 : 2,
+        font: { color: onPath ? '#151006' : dim ? '#63717d' : '#f7fbf8', size: 13, face: 'Noto Serif SC, Songti SC, SimSun, serif', strokeWidth: 3, strokeColor: '#0a1017', vadjust: 2 },
+        shadow: { enabled: true, color: 'rgba(217,180,91,.18)', size: onPath ? 24 : 12, x: 0, y: 0 },
+      });
+    }
+    const links = [];
+    for (const l of state.links) {
+      if (!visible.has(l.from) || !visible.has(l.to)) continue;
+      if (state.relType !== '全部' && l.type !== state.relType) continue;
+      const onPath = state.pathEdges.has(l.edgeId);
+      const incident = state.selected && (l.from === state.selected || l.to === state.selected);
+      const dim = (matches && !(matches.has(l.from) || matches.has(l.to))) || (hasPath && !onPath) || (state.selected && !incident && !onPath);
+      links.push({
+        id: l.id, from: l.from, to: l.to,
+        label: onPath || incident ? relLabel(l.type) : '',
+        title: `${relLabel(l.type)}${l.props.note ? '：' + esc(l.props.note) : ''}`,
+        arrows: { to: { enabled: true, scaleFactor: 0.55 } },
+        color: { color: onPath ? '#f2cf76' : incident ? relColor(l.type) : dim ? '#1a2a37' : '#2a4356', highlight: '#f4d58d', hover: onPath ? '#fde68a' : relColor(l.type) },
+        width: onPath ? 3 : incident ? 2 : 1.1,
+        font: { color: '#d9e2e8', size: 10, face: 'Noto Sans SC, Microsoft YaHei, sans-serif', strokeWidth: 2, strokeColor: '#0a1017', align: 'middle' },
+        smooth: { enabled: true, type: 'dynamic', roundness: 0.22 },
+      });
+    }
+    syncNodes(nodes); syncEdges(links);
+    $('visiblePeople').textContent = nodes.length; $('visibleLinks').textContent = links.length;
+    if (!state.network) initNetwork();
+  }
+
+  function syncNodes(nodes) {
+    const next = new Set(nodes.map((n) => n.id));
+    const stale = state.nodesDS.getIds().filter((id) => !next.has(String(id)));
+    if (stale.length) state.nodesDS.remove(stale);
+    if (nodes.length) state.nodesDS.update(nodes);
+  }
+  function syncEdges(links) {
+    const next = new Set(links.map((l) => l.id));
+    const stale = state.edgesDS.getIds().filter((id) => !next.has(String(id)));
+    if (stale.length) state.edgesDS.remove(stale);
+    if (links.length) state.edgesDS.update(links);
+  }
+
+  function selectPerson(id, focus = false) {
+    if (!state.people.has(id)) return;
+    state.selected = id; renderGraph(); renderDetail();
+    if (focus && state.network) state.network.focus(id, { scale: 1.25, animation: true });
+    if (state.network) state.network.selectNodes([id]);
+  }
+  function clearSelection() { state.selected = null; if (state.network) state.network.unselectAll(); renderGraph(); renderDetail(); }
+
+  function renderDetail() {
+    const box = $('detail');
+    if (!state.selected) {
+      box.innerHTML = `<div class="detail-empty"><div class="big">人物 · 关系</div>点击左侧人物，查看朝代、生平与关系。<br>可用上方朝代筛选、搜索或“随机人物”开始探索。</div>`;
+      return;
+    }
+    const p = state.people.get(state.selected);
+    if (!p) return;
+    const props = p.props || {};
+    const rels = state.links.filter((l) => l.from === state.selected || l.to === state.selected);
+    const relHtml = rels.map((l) => {
+      const otherId = l.from === state.selected ? l.to : l.from;
+      const other = state.people.get(otherId);
+      if (!other) return '';
+      const dir = l.from === state.selected ? '→' : '←';
+      const color = relColor(l.type);
+      return `<button class="relation" data-id="${esc(otherId)}"><span class="rel-icon" style="background:${color}">${dir}</span><span class="rel-body"><span class="rel-line"><b>${esc((other.props || {}).name || '')}</b><span class="rel-type">${esc(relLabel(l.type))}</span></span>${l.props.note ? `<span class="rel-note">${esc(l.props.note)}</span>` : ''}</span></button>`;
+    }).join('');
+    box.innerHTML = `
+      <div class="person-head">
+        <div class="avatar" style="background:linear-gradient(145deg,${dynastyColor(props.dynasty)},#8a6426)">${esc((props.name || '人').slice(0, 1))}</div>
+        <div><h2>${esc(props.name || '')}${props.zi ? `<span class="badge" style="color:${dynastyColor(props.dynasty)}">字 ${esc(props.zi)}</span>` : ''}</h2><p class="person-sub">${esc(props.dynasty || '')} · ${esc(props.title || '')}</p></div>
+      </div>
+      <div class="person-meta"><span>生卒 <b>${year(props.born)} — ${year(props.died)}</b></span><span>关系 <b>${rels.length}</b></span></div>
+      <p class="bio">${esc(props.bio || '暂无生平简介。')}</p>
+      <div class="actions">
+        <button class="gold tiny" id="focusBtn">聚焦人物</button>
+        <button class="tiny" id="pathBtn">${state.pathStart === state.selected ? '取消关系链起点' : '设为关系链起点'}</button>
+        <button class="tiny ghost" id="clearSelBtn">取消选择</button>
+      </div>
+      <div class="section-label">关系 · ${rels.length}</div>
+      <div class="relations">${relHtml || '<div class="detail-empty">暂无关联人物</div>'}</div>`;
+    $('focusBtn').onclick = () => state.network.focus(state.selected, { scale: 1.35, animation: true });
+    $('pathBtn').onclick = () => {
+      if (state.pathStart === state.selected) clearPathMode();
+      else { state.pathStart = state.selected; state.pathInfo = null; state.pathNodes.clear(); state.pathEdges.clear(); renderGraph(); renderPathBanner(); renderDetail(); showToast(`以${props.name || ''}为起点，点击另一个人物查找关系链`); }
+    };
+    $('clearSelBtn').onclick = clearSelection;
+    box.querySelectorAll('.relation').forEach((el) => { el.onclick = () => selectPerson(el.dataset.id, true); });
+  }
+
+  function onPersonClick(id) {
+    if (state.pathStart && state.pathStart !== id && state.people.has(state.pathStart)) { findPath(state.pathStart, id); return; }
+    if (state.pathStart === id) { clearPathMode(); return; }
+    selectPerson(id, true);
+  }
+
+  async function findPath(fromId, toId) {
+    const from = state.people.get(fromId), to = state.people.get(toId);
+    if (!from || !to) return;
+    const q = (s) => String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    const cypher = `MATCH p = shortestPath((a:Person {name: "${q((from.props || {}).name)}"})-[*..8]-(b:Person {name: "${q((to.props || {}).name)}"})) RETURN p`;
+    showToast('正在查找关系链…');
+    try {
+      const res = await api('/query', 'POST', cypher);
+      if (!res.rows || !res.rows.length) {
+        state.pathInfo = null; state.pathNodes.clear(); state.pathEdges.clear(); state.pathStart = null;
+        renderGraph(); renderPathBanner(); showToast('未找到可连通的路径', true); return;
+      }
+      const path = res.rows[0][0];
+      state.pathNodes = new Set((path.nodes || []).map((n) => String(n.id)));
+      state.pathEdges = new Set((path.edges || []).map((e) => String(e.id)));
+      state.pathInfo = { from: fromId, to: toId, length: path.length ?? (path.edges || []).length };
+      state.pathStart = null; state.selected = toId;
+      renderGraph(); renderPathBanner(); renderDetail();
+      showToast(`找到关系链：${state.pathInfo.length} 度`);
+    } catch (err) { showToast(err.message, true); }
+  }
+
+  function clearPathMode() {
+    state.pathStart = null; state.pathInfo = null; state.pathNodes.clear(); state.pathEdges.clear();
+    renderGraph(); renderPathBanner(); renderDetail();
+  }
+
+  function renderPathBanner() {
+    const el = $('pathBanner');
+    if (state.pathStart) {
+      const p = state.people.get(state.pathStart);
+      el.innerHTML = `<span>起点：<b>${esc((p && p.props || {}).name || '')}</b> · 点击另一个人物查找关系链</span><button id="pathCancel" class="ghost">取消</button>`;
+      el.classList.add('show'); $('pathCancel').onclick = clearPathMode; return;
+    }
+    if (state.pathInfo) {
+      const names = [...state.pathNodes].map((id) => ((state.people.get(id) || {}).props || {}).name || '?');
+      el.innerHTML = `<span class="chain">关系链：${names.map(esc).join(' → ')} · ${state.pathInfo.length} 度</span><button id="pathClear" class="ghost">清除</button>`;
+      el.classList.add('show'); $('pathClear').onclick = clearPathMode; return;
+    }
+    el.classList.remove('show'); el.innerHTML = '';
+  }
+
+  function searchResults() {
+    const q = state.query.trim().toLowerCase();
+    const box = $('searchResults');
+    if (!q) { box.classList.remove('show'); box.innerHTML = ''; return; }
+    const found = [...state.people.values()].filter((p) => {
+      const props = p.props || {};
+      return [props.name, props.zi, props.dynasty, props.title, props.bio, p.labels || []].flat().join(' ').toLowerCase().includes(q);
+    }).slice(0, 8);
+    box.innerHTML = found.map((p) => {
+      const props = p.props || {};
+      return `<button class="search-item" data-id="${esc(p.id)}"><b>${esc(props.name || '')}</b><span>${esc(props.dynasty || '')} · ${esc(props.title || '')}</span></button>`;
+    }).join('') || `<div class="search-item"><span>没有找到匹配人物</span></div>`;
+    box.classList.add('show');
+    box.querySelectorAll('.search-item[data-id]').forEach((el) => {
+      el.onclick = () => { $('search').value = ''; state.query = ''; box.classList.remove('show'); selectPerson(el.dataset.id, true); renderGraph(); };
+    });
+  }
+
+  async function seed() {
+    const btn = $('seedBtn'); btn.disabled = true; btn.textContent = '正在载入…';
+    try { await api('/update', 'POST', SEED); showToast('示例人物图谱已载入'); state.selected = null; await load(); }
+    catch (err) { showToast(err.message, true); btn.disabled = false; btn.textContent = '载入示例人物图谱'; }
+  }
+  function randomPerson() {
+    const people = visiblePeople();
+    if (!people.length) return showToast('当前筛选下没有人物', true);
+    selectPerson(String(people[Math.floor(Math.random() * people.length)].id), true);
+  }
+
+  function bindUI() {
+    $('seedBtn').onclick = seed;
+    $('randomBtn').onclick = randomPerson;
+    $('fitBtn').onclick = () => state.network && state.network.fit({ animation: { duration: 500 } });
+    $('reloadBtn').onclick = load;
+    $('search').addEventListener('input', (e) => { state.query = e.target.value; renderGraph(); searchResults(); });
+    $('search').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { const first = $('searchResults').querySelector('[data-id]'); if (first) first.click(); }
+      else if (e.key === 'Escape') { $('search').value = ''; state.query = ''; $('searchResults').classList.remove('show'); renderGraph(); }
+    });
+    document.addEventListener('click', (e) => { if (!e.target.closest('.search-wrap')) $('searchResults').classList.remove('show'); });
+  }
+
+  async function boot() {
+    bindUI(); initNetwork();
+    try {
+      const stats = await api('/stats');
+      setConn(true, '已连接');
+      if (!stats.nodes || stats.nodes === 0) {
+        showEmpty('数据库为空，载入一份示例历史人物图谱开始探索。', '载入示例人物图谱');
+        $('loading').classList.add('hidden'); $('counter').innerHTML = `<b>0</b> 人物 · <b>0</b> 关系`;
+        return;
+      }
+      await load();
+    } catch (err) {
+      setConn(false, '连接失败'); showEmpty(err.message, '重新连接'); $('loading').classList.add('hidden');
+    }
+  }
+
+  boot();
 })();
 </script>
 </body>
