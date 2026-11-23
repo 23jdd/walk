@@ -683,9 +683,12 @@ func (e *Exec) Delete(in Stream, v string, detach bool) Stream {
 			var err error
 			switch ent.Kind {
 			case NodeKind:
+				if !e.NodeExists(ent.Id) {
+					continue
+				}
 				err = e.DeleteNode(ent.Id, detach)
 			case EdgeKind:
-				err = e.DeleteEdge(ent.Id)
+				_, err = e.DeleteEdgeIfExists(ent.Id)
 			default:
 				err = fmt.Errorf("%w: cannot delete path", ErrTypeMismatch)
 			}

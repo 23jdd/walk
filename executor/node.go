@@ -35,8 +35,9 @@ func (n *Node) Marshal() ([]byte, error) {
 
 func (n *Node) Unmarshal(data []byte) error {
 	type nodeJSON struct {
-		Labels []string         `json:"labels"`
-		Props  map[string]Value `json:"props"`
+		Labels     []string         `json:"labels"`
+		Props      map[string]Value `json:"props"`
+		Properties map[string]Value `json:"properties"`
 	}
 	var v nodeJSON
 	if err := json.Unmarshal(data, &v); err != nil {
@@ -47,6 +48,9 @@ func (n *Node) Unmarshal(data []byte) error {
 		n.Labels = make([]string, 0)
 	}
 	n.Props = v.Props
+	if n.Props == nil {
+		n.Props = v.Properties
+	}
 	if n.Props == nil {
 		n.Props = make(map[string]Value)
 	}

@@ -33,14 +33,22 @@ func (e *Edge) Marshal() ([]byte, error) {
 
 func (e *Edge) Unmarshal(data []byte) error {
 	type edgeJSON struct {
-		From  uint64           `json:"from"`
-		To    uint64           `json:"to"`
-		Type  string           `json:"type"`
-		Props map[string]Value `json:"props"`
+		From       uint64           `json:"from"`
+		To         uint64           `json:"to"`
+		Type       string           `json:"type"`
+		Relation   string           `json:"relation"`
+		Props      map[string]Value `json:"props"`
+		Properties map[string]Value `json:"properties"`
 	}
 	var v edgeJSON
 	if err := json.Unmarshal(data, &v); err != nil {
 		return err
+	}
+	if v.Type == "" {
+		v.Type = v.Relation
+	}
+	if v.Props == nil {
+		v.Props = v.Properties
 	}
 	e.From, e.To, e.Type = v.From, v.To, v.Type
 	e.Props = v.Props
