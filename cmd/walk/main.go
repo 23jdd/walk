@@ -28,10 +28,10 @@ func main() {
 }
 
 func usage(w io.Writer) {
-	fmt.Fprintf(w, `gstore %s - bbolt property graph with a Cypher subset
+	fmt.Fprintf(w, `walk %s - bbolt property graph with a Cypher subset
 
 usage:
-  gstore [--db=./graph.db] <command> [options]
+  walk [--db=./graph.db] <command> [options]
 
 commands:
   load     --nodes <file> [--edges <file>] [--format=auto|jsonl|csv] [--batch-size=N]
@@ -66,7 +66,7 @@ type commonFlags struct {
 
 func addCommon(fs *flag.FlagSet) *commonFlags {
 	c := &commonFlags{}
-	fs.StringVar(&c.db, "db", envDefault("GSTORE_DB", "./graph.db"), "database file")
+	fs.StringVar(&c.db, "db", envDefault("WALK_DB", "./graph.db"), "database file")
 	fs.DurationVar(&c.timeout, "timeout", 5*time.Second, "query timeout")
 	fs.IntVar(&c.maxSolutions, "max-solutions", 1_000_000, "maximum solutions")
 	fs.IntVar(&c.maxDepth, "max-depth", 8, "variable-length path maximum depth")
@@ -127,7 +127,7 @@ func run(args []string) int {
 		usage(os.Stdout)
 		return 0
 	case "version":
-		fmt.Println("gstore " + version)
+		fmt.Println("walk " + version)
 		return 0
 	case "load":
 		return cmdLoad(args[1:])
@@ -445,7 +445,7 @@ func cmdServe(args []string) int {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	common := addCommon(fs)
-	addr := fs.String("addr", envDefault("GSTORE_ADDR", ":7474"), "listen address")
+	addr := fs.String("addr", envDefault("WALK_ADDR", ":7474"), "listen address")
 	if err := fs.Parse(args); err != nil {
 		return 1
 	}
