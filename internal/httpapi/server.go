@@ -1,4 +1,9 @@
-package walk
+// Package httpapi exposes a walk graph over HTTP.
+//
+// It lives outside the walk package on purpose: walk itself is only the graph
+// database/query engine, while the HTTP transport is an optional adapter used
+// by cmd/walk and the single-file demo.
+package httpapi
 
 import (
 	"context"
@@ -10,15 +15,15 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime/debug"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/23jdd/walk"
 	"github.com/23jdd/walk/parser"
 )
 
-// ServerOptions configures the HTTP interface (F-18).
-type ServerOptions struct {
+// Options configures the HTTP adapter.
+type Options struct {
 	Timeout      time.Duration
 	MaxSolutions int
 	MaxDepth     int
@@ -26,13 +31,13 @@ type ServerOptions struct {
 	Logger       *slog.Logger
 }
 
-// Server exposes the graph over HTTP.
+// Server is the HTTP adapter around a walk database.
 type Server struct {
-	db   *DB
-	opts ServerOptions
+	db   *walk.DB
+	opts Options
 }
 
-func NewServer(db *DB, opts ServerOptions) *Server {
+func New(db *walk.DB, opts Options) *Server {
 	if opts.Timeout <= 0 {
 		opts.Timeout = 5 * time.Second
 	}
@@ -149,7 +154,7 @@ func (s *Server) execute(w http.ResponseWriter, r *http.Request, cypher string) 
 	ctx, cancel := context.WithTimeout(r.Context(), s.opts.Timeout)
 	defer cancel()
 	start := time.Now()
-	res, err := s.db.Query(ctx, cypher, QueryOptions{
+	res, err := s.db.Query(ctx, cypher, walk.QueryOptions{
 		Timeout:      s.opts.Timeout,
 		MaxSolutions: s.opts.MaxSolutions,
 		MaxDepth:     s.opts.MaxDepth,
@@ -182,23 +187,9 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, fmt.Errorf("method not allowed"))
 		return
 	}
-	s.db.mu.RLock()
-	defer s.db.mu.RUnlock()
-	if s.db.bolt == nil {
-		writeError(w, http.StatusServiceUnavailable, ErrClosed)
-		return
-	}
-	tx, err := s.db.bolt.Begin(false)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err)
-		return
-	}
-	defer func() { _ = tx.Rollback() }()
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Disposition", `attachment; filename="graph.db"`)
-	w.Header().Set("Content-Length", strconv.FormatInt(tx.Size(), 10))
-	w.WriteHeader(http.StatusOK)
-	if _, err := tx.WriteTo(w); err != nil {
+	if err := s.db.BackupTo(w); err != nil {
 		s.opts.Logger.Warn("backup stream failed", "error", err)
 	}
 }

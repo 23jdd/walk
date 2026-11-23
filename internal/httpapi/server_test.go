@@ -1,19 +1,36 @@
-package walk
+package httpapi
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/23jdd/walk"
 )
 
+func testDB(t *testing.T) *walk.DB {
+	t.Helper()
+	db, err := walk.Open(filepath.Join(t.TempDir(), "graph.db"))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	return db
+}
+
 func TestHTTPServer(t *testing.T) {
-	db := newTestDB(t)
-	srv := httptest.NewServer(NewServer(db, ServerOptions{Timeout: 5 * time.Second}).Handler())
+	db := testDB(t)
+	ctx := context.Background()
+	if _, err := db.Query(ctx, `CREATE (a:Person {name: 'Alice'}), (b:Person {name: 'Bob'}), (a)-[:KNOWS]->(b)`, walk.QueryOptions{}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	srv := httptest.NewServer(New(db, Options{Timeout: 5 * time.Second}).Handler())
 	defer srv.Close()
 
 	post := func(path, body string) *http.Response {
@@ -25,17 +42,17 @@ func TestHTTPServer(t *testing.T) {
 		return resp
 	}
 
-	resp := post("/update", `CREATE (a:Person {name: 'Alice'}), (b:Person {name: 'Bob'}), (a)-[:KNOWS]->(b)`)
+	resp := post("/update", `CREATE (c:Person {name: 'Carol'})`)
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("update status=%d body=%s", resp.StatusCode, b)
 	}
-	var update Result
+	var update walk.Result
 	if err := json.NewDecoder(resp.Body).Decode(&update); err != nil {
 		t.Fatalf("decode update: %v", err)
 	}
 	resp.Body.Close()
-	if update.Summary == nil || update.Summary.NodesCreated != 2 {
+	if update.Summary == nil || update.Summary.NodesCreated != 1 {
 		t.Fatalf("summary=%+v", update.Summary)
 	}
 
@@ -44,57 +61,48 @@ func TestHTTPServer(t *testing.T) {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("query status=%d body=%s", resp.StatusCode, b)
 	}
-	var qr Result
+	var qr walk.Result
 	if err := json.NewDecoder(resp.Body).Decode(&qr); err != nil {
 		t.Fatalf("decode query: %v", err)
 	}
 	resp.Body.Close()
-	if len(qr.Rows) != 2 || qr.Columns[0] != "name" {
+	if len(qr.Rows) != 3 || qr.Columns[0] != "name" {
 		t.Fatalf("query result=%+v", qr)
 	}
 
-	// /query must reject writes.
 	resp = post("/query", `CREATE (x:Person)`)
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for write on /query, got %d", resp.StatusCode)
 	}
 	resp.Body.Close()
 
-	// Stats.
 	r, err := http.Get(srv.URL + "/stats")
 	if err != nil {
 		t.Fatalf("stats: %v", err)
 	}
-	var stats GraphStats
+	var stats walk.GraphStats
 	if err := json.NewDecoder(r.Body).Decode(&stats); err != nil {
 		t.Fatalf("decode stats: %v", err)
 	}
 	r.Body.Close()
-	if stats.Nodes != 2 || stats.Edges != 1 {
+	if stats.Nodes != 3 || stats.Edges != 1 {
 		t.Fatalf("stats=%+v", stats)
 	}
 
-	// Backup snapshot.
 	r, err = http.Get(srv.URL + "/backup")
 	if err != nil {
 		t.Fatalf("backup: %v", err)
 	}
 	data, err := io.ReadAll(r.Body)
 	r.Body.Close()
-	if err != nil || len(data) == 0 {
+	if err != nil || len(data) < 4096 {
 		t.Fatalf("backup read: %v len=%d", err, len(data))
-	}
-	if !bytes.HasPrefix(data, []byte("\x00\x00\x00\x00")) && !bytes.Contains(data, []byte("bbolt")) {
-		// bbolt files start with page headers; just require a plausible size.
-		if len(data) < 4096 {
-			t.Fatalf("backup too small: %d", len(data))
-		}
 	}
 }
 
 func TestHTTPCORS(t *testing.T) {
-	db := newTestDB(t)
-	srv := httptest.NewServer(NewServer(db, ServerOptions{}).Handler())
+	db := testDB(t)
+	srv := httptest.NewServer(New(db, Options{}).Handler())
 	defer srv.Close()
 
 	req, err := http.NewRequest(http.MethodOptions, srv.URL+"/query", nil)
