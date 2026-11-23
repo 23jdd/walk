@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>walk · vis-network demo</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/styles/vis-network.min.css">
+<style>
+  :root { --bg:#070d17; --panel:#0c1624; --line:#1e3548; --text:#e6edf3; --muted:#8ba3b8; --green:#34d399; --cyan:#22d3ee; --red:#fb7185; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; color: var(--text); font: 14px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: radial-gradient(1100px 650px at 12% -10%, rgba(34,211,238,.13), transparent 60%),
+                radial-gradient(900px 600px at 100% 0%, rgba(52,211,153,.10), transparent 55%), var(--bg);
+  }
+  header { display:flex; align-items:center; gap:14px; padding:12px 20px; border-bottom:1px solid var(--line); background:rgba(7,13,23,.82); position:sticky; top:0; z-index:5; }
+  .brand { display:flex; align-items:center; gap:10px; }
+  .brand svg { width:36px; height:36px; }
+  h1 { font-size:17px; margin:0; } h1 span { color:var(--muted); font-weight:500; }
+  .conn { margin-left:auto; display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+  .dot { width:8px; height:8px; border-radius:50%; background:#fbbf24; box-shadow:0 0 9px #fbbf24; }
+  .dot.ok { background:var(--green); box-shadow:0 0 9px var(--green); }
+  .dot.bad { background:var(--red); box-shadow:0 0 9px var(--red); }
+  #status { color:var(--muted); font-size:12px; }
+  input, textarea, button { font: inherit; }
+  input[type=text] { width:230px; padding:8px 10px; color:var(--text); background:#08111d; border:1px solid var(--line); border-radius:9px; outline:none; }
+  input[type=text]:focus, textarea:focus { border-color:rgba(52,211,153,.7); box-shadow:0 0 0 3px rgba(52,211,153,.10); }
+  button { padding:8px 11px; color:var(--text); background:#122337; border:1px solid var(--line); border-radius:9px; cursor:pointer; white-space:nowrap; }
+  button:hover { background:#163049; border-color:rgba(34,211,238,.55); }
+  button:disabled { opacity:.45; cursor:wait; }
+  button.primary { background:linear-gradient(135deg,#0e7490,#047857); border-color:rgba(52,211,153,.5); }
+  button.danger { color:#fecdd3; background:rgba(251,113,133,.08); border-color:rgba(251,113,133,.35); }
+  main { display:grid; grid-template-columns:minmax(330px,400px) minmax(0,1fr); gap:14px; padding:14px 20px 20px; height:calc(100vh - 61px); }
+  .panel { background:linear-gradient(180deg,rgba(16,31,48,.9),rgba(12,22,36,.96)); border:1px solid var(--line); border-radius:14px; min-height:0; }
+  aside { display:flex; flex-direction:column; gap:11px; padding:13px; overflow:auto; }
+  .label { color:var(--muted); font-size:10.5px; font-weight:700; letter-spacing:.9px; text-transform:uppercase; }
+  .row { display:flex; gap:7px; flex-wrap:wrap; }
+  textarea {
+    width:100%; min-height:112px; resize:vertical; padding:10px; color:#d7fbe8; background:#07101b;
+    border:1px solid var(--line); border-radius:10px; outline:none;
+    font:12.5px/1.55 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  }
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+  .stat { padding:8px; background:rgba(7,16,27,.6); border:1px solid var(--line); border-radius:9px; text-align:center; }
+  .stat b { display:block; color:#a7f3d0; font-size:16px; } .stat span { color:var(--muted); font-size:10px; }
+  #summary { display:none; padding:8px 9px; color:#a7f3d0; background:rgba(52,211,153,.07); border:1px solid rgba(52,211,153,.18); border-radius:9px; font:11.5px ui-monospace,Consolas,monospace; }
+  .table { max-height:190px; overflow:auto; border:1px solid var(--line); border-radius:9px; background:#07101b; }
+  table { border-collapse:collapse; width:100%; font-size:11.5px; }
+  th, td { padding:6px 8px; text-align:left; border-bottom:1px solid rgba(30,53,72,.7); vertical-align:top; }
+  th { position:sticky; top:0; background:#0c1a29; color:#9fd8c4; } tr:last-child td { border-bottom:0; }
+  .null { color:#64748b; font-style:italic; } td code { color:#93c5fd; font:10.5px ui-monospace,Consolas,monospace; }
+  .empty { padding:12px; color:var(--muted); font-size:12px; }
+  #log { margin:0; height:110px; overflow:auto; padding:9px; color:#9fb3c7; background:rgba(5,10,18,.6); border:1px solid var(--line); border-radius:9px; font:11px/1.6 ui-monospace,Consolas,monospace; white-space:pre-wrap; }
+  .graph { display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+  .toolbar { display:flex; align-items:center; gap:10px; padding:9px 12px; border-bottom:1px solid var(--line); color:var(--muted); font-size:12px; flex-wrap:wrap; }
+  .toolbar .spacer { flex:1; }
+  #network { flex:1; min-height:420px; }
+  .hint { color:var(--muted); font-size:11.5px; } .hint b { color:#a7f3d0; }
+  #toast { position:fixed; right:16px; bottom:16px; max-width:420px; padding:10px 13px; border-radius:10px; background:#0b1a29; border:1px solid var(--line); color:var(--text); opacity:0; transform:translateY(8px); transition:.18s; pointer-events:none; z-index:20; }
+  #toast.show { opacity:1; transform:translateY(0); } #toast.error { border-color:rgba(251,113,133,.55); }
+  @media (max-width:960px) { main { grid-template-columns:1fr; height:auto; } .graph { min-height:70vh; } header { flex-wrap:wrap; } .conn { margin-left:0; width:100%; } input[type=text] { flex:1; width:auto; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <svg viewBox="0 0 256 256" aria-hidden="true">
+      <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset=".55" stop-color="#34d399"/><stop offset="1" stop-color="#a3e635"/></linearGradient></defs>
+      <rect x="8" y="8" width="240" height="240" rx="58" fill="#0b1220" stroke="#1e3a46" stroke-width="2"/>
+      <path d="M54 82 L98 174 L140 104 L182 174 L218 86" fill="none" stroke="url(#g)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+      <g fill="#071019" stroke="url(#g)" stroke-width="6"><circle cx="54" cy="82" r="13"/><circle cx="98" cy="174" r="13"/><circle cx="140" cy="104" r="11"/><circle cx="182" cy="174" r="13"/><circle cx="218" cy="86" r="11"/></g>
+      <g fill="#ecfeff"><circle cx="54" cy="82" r="3"/><circle cx="98" cy="174" r="3"/><circle cx="140" cy="104" r="2.6"/><circle cx="182" cy="174" r="3"/><circle cx="218" cy="86" r="2.6"/></g>
+    </svg>
+    <h1>walk <span>graph demo</span></h1>
+  </div>
+  <div class="conn">
+    <i id="dot" class="dot"></i><span id="status">未连接</span>
+    <input id="server" type="text" value="http://127.0.0.1:7474" spellcheck="false" aria-label="walk HTTP 地址">
+    <button id="connect">连接</button>
+  </div>
+</header>
+
+<main>
+  <aside class="panel">
+    <div class="label">操作</div>
+    <div class="row">
+      <button id="seed" class="primary">导入示例数据</button>
+      <button id="refresh">刷新图</button>
+      <button id="fit">适配视图</button>
+      <button id="clear" class="danger">清空</button>
+    </div>
+    <div class="label">Cypher（Ctrl + Enter 执行）</div>
+    <textarea id="cypher" spellcheck="false"></textarea>
+    <div class="row">
+      <button id="query" class="primary">执行查询</button>
+      <button id="write">执行写入</button>
+      <button id="explain">EXPLAIN</button>
+    </div>
+    <div class="hint">查询走 <b>POST /query</b>，写入走 <b>POST /update</b>；图数据由 <b>MATCH (n) RETURN n</b> 和 <b>MATCH ()-[r]-&gt;() RETURN r</b> 通过 HTTP 加载。</div>
+    <div class="stats">
+      <div class="stat"><b id="sNodes">–</b><span>节点</span></div>
+      <div class="stat"><b id="sEdges">–</b><span>关系</span></div>
+      <div class="stat"><b id="sLabels">–</b><span>标签</span></div>
+      <div class="stat"><b id="sTypes">–</b><span>类型</span></div>
+    </div>
+    <div id="summary"></div>
+    <div class="label">结果 <span id="meta" class="hint"></span></div>
+    <div class="table" id="result"><div class="empty">点击“导入示例数据”开始。</div></div>
+    <pre id="log">[demo] 等待连接 walk 服务…</pre>
+  </aside>
+
+  <section class="panel graph">
+    <div class="toolbar"><span id="graphMeta">0 nodes · 0 edges</span><span class="spacer"></span><label class="hint"><input type="checkbox" id="physics" checked> 物理布局</label></div>
+    <div id="network"></div>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const DEFAULT_QUERY = `MATCH (n:Person)\nRETURN n.name AS name, n.age AS age\nORDER BY age`;
+  const SEED = `CREATE (a:Person {name: "Alice", age: 39, city: "Paris"}),
+       (b:Person {name: "Bob", age: 27, city: "Berlin"}),
+       (c:Person {name: "Carol", age: 34, city: "Paris"}),
+       (d:Project {name: "walk", stars: 128}),
+       (e:Project {name: "bbolt", stars: 512}),
+       (a)-[:KNOWS {since: 2020}]->(b),
+       (b)-[:KNOWS {since: 2022}]->(c),
+       (a)-[:WORKS_ON {role: "maintainer"}]->(d),
+       (c)-[:WORKS_ON {role: "designer"}]->(d),
+       (d)-[:DEPENDS_ON]->(e)`;
+
+  const state = { network: null, nodes: null, edges: null, busy: false };
+  if (!window.vis || !vis.Network || !vis.DataSet) {
+    $('log').textContent = '[demo] vis-network 加载失败：请检查 cdn.jsdelivr.net 是否可访问。';
+    return;
+  }
+  state.nodes = new vis.DataSet([]);
+  state.edges = new vis.DataSet([]);
+
+  const palette = ['#22d3ee','#34d399','#a3e635','#fbbf24','#fb7185','#c084fc','#60a5fa','#f472b6'];
+  const colors = new Map();
+  function colorFor(label) {
+    if (!colors.has(label)) {
+      let h = 0; for (let i = 0; i < label.length; i++) h = (h * 31 + label.charCodeAt(i)) >>> 0;
+      colors.set(label, palette[h % palette.length]);
+    }
+    return colors.get(label);
+  }
+  const base = () => ($('server').value || '').trim().replace(/\/+$/, '');
+  const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  async function api(path, method = 'GET', body = null) {
+    const url = base() + path;
+    const opt = { method, mode: 'cors', headers: {} };
+    if (body !== null) { opt.headers['Content-Type'] = 'text/plain;charset=UTF-8'; opt.body = body; }
+    let res;
+    try { res = await fetch(url, opt); }
+    catch (e) { throw new Error(`无法连接 ${url}。请先运行 walk serve --addr=:7474，并确认 CORS。原始错误：${e.message}`); }
+    const text = await res.text();
+    let data; try { data = text ? JSON.parse(text) : null; } catch { data = { error: text }; }
+    if (!res.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
+    return data;
+  }
+
+  function toast(msg, error = false) {
+    const el = $('toast'); el.textContent = msg; el.classList.toggle('error', error); el.classList.add('show');
+    clearTimeout(toast.timer); toast.timer = setTimeout(() => el.classList.remove('show'), 3600);
+  }
+  function log(msg) {
+    const el = $('log'); el.textContent += `\n[${new Date().toLocaleTimeString()}] ${msg}`;
+    el.scrollTop = el.scrollHeight;
+  }
+  function conn(ok, msg) { $('dot').className = 'dot ' + (ok ? 'ok' : 'bad'); $('status').textContent = msg; }
+
+  function renderTable(res) {
+    const box = $('result'), meta = $('meta');
+    if (!res || !res.columns || !res.columns.length) {
+      box.innerHTML = '<div class="empty">没有列；写入语句通常只返回 summary。</div>';
+      meta.textContent = res && res.summary ? 'summary' : '';
+      return;
+    }
+    const rows = res.rows || [];
+    meta.textContent = `${rows.length} 行`;
+    const head = res.columns.map((c) => `<th>${esc(c)}</th>`).join('');
+    const body = rows.slice(0, 500).map((r) => `<tr>${r.map((v) => `<td>${fmt(v)}</td>`).join('')}</tr>`).join('');
+    box.innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body || `<tr><td colspan="${res.columns.length}"><span class="null">0 rows</span></td></tr>`}</tbody></table>`;
+  }
+  function fmt(v) {
+    if (v === null || v === undefined) return '<span class="null">null</span>';
+    if (typeof v === 'object') return `<code>${esc(JSON.stringify(v))}</code>`;
+    return esc(v);
+  }
+  function renderSummary(res) {
+    const box = $('summary');
+    if (!res || !res.summary) { box.style.display = 'none'; return; }
+    const text = Object.entries(res.summary).filter(([, v]) => v !== 0).map(([k, v]) => `${k}=${v}`).join('  ');
+    box.textContent = text || 'no changes'; box.style.display = 'block';
+  }
+
+  function addNode(n) {
+    if (!n || n.id === undefined || n.id === null) return;
+    const labels = Array.isArray(n.labels) ? n.labels : [];
+    const primary = labels[0] || 'Node';
+    const title = (n.props && (n.props.name || n.props.title)) || '';
+    state.nodes.update({
+      id: String(n.id), label: `${primary}\n${title}`,
+      title: `<b>Node ${esc(n.id)}</b><br>${esc(labels.join(': '))}<br><code>${esc(JSON.stringify(n.props || {}))}</code>`,
+      color: { background: colorFor(primary), border: '#e6edf3', highlight: { background: '#fbbf24', border: '#fff' } },
+      font: { color: '#071019', size: 12 }, shape: 'dot', size: 22, borderWidth: 2
+    });
+  }
+  function addEdge(e) {
+    if (!e || e.id === undefined) return;
+    state.edges.update({
+      id: 'e' + e.id, from: String(e.from), to: String(e.to), label: e.type || '',
+      title: `<b>Edge ${esc(e.id)}</b> · ${esc(e.type || '')}<br><code>${esc(JSON.stringify(e.props || {}))}</code>`,
+      arrows: 'to', color: { color: '#22d3ee', highlight: '#fbbf24' },
+      font: { color: '#a7f3d0', size: 10 }, smooth: { enabled: true, type: 'dynamic' }
+    });
+  }
+  function ensureNode(id) { if (!state.nodes.get(String(id))) addNode({ id, labels: ['?'], props: {} }); }
+  function refreshView() {
+    $('graphMeta').textContent = `${state.nodes.length} nodes · ${state.edges.length} edges`;
+    state.network.setData({ nodes: state.nodes, edges: state.edges });
+    state.network.fit({ animation: { duration: 400 } });
+  }
+
+  async function loadGraph() {
+    const [nr, er] = await Promise.all([
+      api('/query', 'POST', 'MATCH (n) RETURN n'),
+      api('/query', 'POST', 'MATCH (a)-[r]->(b) RETURN r')
+    ]);
+    state.nodes.clear(); state.edges.clear();
+    (nr.rows || []).forEach((r) => r[0] && addNode(r[0]));
+    (er.rows || []).forEach((r) => { const e = r[0]; if (!e) return; ensureNode(e.from); ensureNode(e.to); addEdge(e); });
+    refreshView(); log(`图已刷新：${state.nodes.length} nodes / ${state.edges.length} edges`);
+  }
+  async function loadStats() {
+    const s = await api('/stats');
+    $('sNodes').textContent = s.nodes ?? '–'; $('sEdges').textContent = s.edges ?? '–';
+    $('sLabels').textContent = (s.labels || []).length; $('sTypes').textContent = (s.types || []).length;
+  }
+  async function connect() {
+    try {
+      await api('/health'); conn(true, '已连接'); log('已连接 ' + base());
+      await Promise.all([loadGraph(), loadStats()]);
+    } catch (e) { conn(false, '连接失败'); log(e.message); toast(e.message, true); }
+  }
+
+  async function run(kind) {
+    if (state.busy) return;
+    const cypher = $('cypher').value.trim();
+    if (!cypher) return toast('请输入 Cypher', true);
+    state.busy = true;
+    ['query','write','explain','seed','refresh','clear'].forEach((id) => $(id).disabled = true);
+    const t0 = performance.now();
+    try {
+      let res;
+      if (kind === 'explain') {
+        res = await api('/query', 'POST', 'EXPLAIN ' + cypher.replace(/^EXPLAIN\s+/i, ''));
+        renderTable(res); renderSummary(null);
+      } else {
+        res = await api(kind === 'write' ? '/update' : '/query', 'POST', cypher);
+        renderTable(res); renderSummary(res);
+        if (kind === 'write' || hasGraph(res)) await Promise.all([loadGraph(), loadStats()]);
+      }
+      log(`${kind === 'explain' ? 'EXPLAIN' : kind === 'write' ? '写入' : '查询'}完成 (${Math.round(performance.now() - t0)}ms)`);
+    } catch (e) {
+      log('错误: ' + e.message); toast(e.message, true); renderSummary(null);
+      $('result').innerHTML = `<div class="empty" style="color:#fecdd3">${esc(e.message)}</div>`;
+    } finally {
+      state.busy = false;
+      ['query','write','explain','seed','refresh','clear'].forEach((id) => $(id).disabled = false);
+    }
+  }
+  function hasGraph(res) {
+    for (const row of res.rows || []) for (const cell of row) {
+      if (cell && typeof cell === 'object' && (Array.isArray(cell.labels) || (cell.from !== undefined && cell.to !== undefined) || Array.isArray(cell.nodes))) return true;
+    }
+    return false;
+  }
+  async function seed() {
+    if (state.busy) return;
+    state.busy = true;
+    try { await api('/update', 'POST', SEED); toast('示例数据已创建'); await Promise.all([loadGraph(), loadStats()]); }
+    catch (e) { toast(e.message, true); log('导入失败: ' + e.message); }
+    finally { state.busy = false; }
+  }
+  async function clearAll() {
+    if (!confirm('确定删除所有节点和关系？')) return;
+    try { await api('/update', 'POST', 'MATCH (n) DETACH DELETE n'); toast('已清空'); await Promise.all([loadGraph(), loadStats()]); }
+    catch (e) { toast(e.message, true); }
+  }
+
+  function initNetwork() {
+    state.network = new vis.Network($('network'), { nodes: state.nodes, edges: state.edges }, {
+      autoResize: true,
+      physics: { enabled: true, stabilization: { iterations: 200 }, barnesHut: { gravitationalConstant: -8000, springLength: 150 } },
+      interaction: { hover: true, multiselect: true },
+      layout: { improvedLayout: true }
+    });
+    state.network.on('click', (p) => {
+      if (p.nodes.length) { const n = state.nodes.get(p.nodes[0]); if (n) $('cypher').value = `MATCH (n) WHERE id(n) = ${n.id} RETURN n`; }
+    });
+    $('physics').addEventListener('change', (e) => state.network.setOptions({ physics: { enabled: e.target.checked } }));
+  }
+
+  $('cypher').value = DEFAULT_QUERY;
+  initNetwork();
+  $('connect').onclick = connect;
+  $('seed').onclick = seed;
+  $('refresh').onclick = () => Promise.all([loadGraph(), loadStats()]).catch((e) => toast(e.message, true));
+  $('fit').onclick = () => state.network.fit({ animation: true });
+  $('clear').onclick = clearAll;
+  $('query').onclick = () => run('query');
+  $('write').onclick = () => run('write');
+  $('explain').onclick = () => run('explain');
+  $('server').onchange = connect;
+  $('cypher').addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); run('query'); } });
+  connect();
+})();
+</script>
+</body>
+</html>

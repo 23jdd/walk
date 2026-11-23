@@ -91,3 +91,45 @@ func TestHTTPServer(t *testing.T) {
 		}
 	}
 }
+
+func TestHTTPCORS(t *testing.T) {
+	db := newTestDB(t)
+	srv := httptest.NewServer(NewServer(db, ServerOptions{}).Handler())
+	defer srv.Close()
+
+	req, err := http.NewRequest(http.MethodOptions, srv.URL+"/query", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Origin", "null")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+	req.Header.Set("Access-Control-Request-Headers", "content-type")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("preflight: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("preflight status=%d", resp.StatusCode)
+	}
+	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "*" {
+		t.Fatalf("allow-origin=%q", got)
+	}
+	if got := resp.Header.Get("Access-Control-Allow-Headers"); !strings.Contains(strings.ToLower(got), "content-type") {
+		t.Fatalf("allow-headers=%q", got)
+	}
+
+	req, err = http.NewRequest(http.MethodGet, srv.URL+"/stats", nil)
+	if err != nil {
+		t.Fatalf("new stats request: %v", err)
+	}
+	req.Header.Set("Origin", "null")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("stats: %v", err)
+	}
+	defer resp.Body.Close()
+	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "*" {
+		t.Fatalf("stats allow-origin=%q", got)
+	}
+}
