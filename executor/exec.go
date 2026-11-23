@@ -222,7 +222,13 @@ func (e *Exec) CreateNode(labels []string, props map[string]Value) (*Node, error
 
 // PutNode inserts a node. A zero ID triggers sequence allocation; a non-zero
 // ID is treated as an explicit import and must not collide (F-05).
-func (e *Exec) PutNode(n *Node) error {
+func (e *Exec) PutNode(n *Node) error { return e.putNode(n, n != nil && n.ID != 0) }
+
+// PutNodeExplicit inserts a node with an exact id, including id 0. Used by the
+// CSV importer where the 0-based row number is the id.
+func (e *Exec) PutNodeExplicit(n *Node) error { return e.putNode(n, true) }
+
+func (e *Exec) putNode(n *Node, explicit bool) error {
 	if err := e.Check(); err != nil {
 		return err
 	}
@@ -234,7 +240,7 @@ func (e *Exec) PutNode(n *Node) error {
 		return err
 	}
 	nodes := e.bucket(BucketNodes)
-	if n.ID == 0 {
+	if !explicit {
 		id, err := nodes.NextSequence()
 		if err != nil {
 			return err
