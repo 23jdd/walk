@@ -73,11 +73,11 @@ func ValueInt(v int64) Value     { return IntValue(v) }
 func ValueFloat(v float64) Value { return FloatValue(v) }
 func ValueString(v string) Value { return StringValue(v) }
 
-func (v Value) Type() DataType    { return v.kind }
-func (v Value) IsNull() bool      { return v.kind == NullType }
-func (v Value) AsInt() int64      { return v.i }
-func (v Value) AsBool() bool      { return v.b }
-func (v Value) AsString() string  { return v.s }
+func (v Value) Type() DataType   { return v.kind }
+func (v Value) IsNull() bool     { return v.kind == NullType }
+func (v Value) AsInt() int64     { return v.i }
+func (v Value) AsBool() bool     { return v.b }
+func (v Value) AsString() string { return v.s }
 func (v Value) AsFloat() float64 {
 	if v.kind == IntType {
 		return float64(v.i)

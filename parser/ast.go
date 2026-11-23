@@ -29,9 +29,9 @@ func (s Span) Merge(o Span) Span {
 
 // ParseError carries a precise source position (F-08 error diagnostics).
 type ParseError struct {
-	Span    Span
-	Msg     string
-	Source  string
+	Span   Span
+	Msg    string
+	Source string
 }
 
 func (e *ParseError) Error() string {
@@ -173,7 +173,7 @@ type LiteralExpr struct {
 	Span  Span
 }
 
-func (*LiteralExpr) exprNode()     {}
+func (*LiteralExpr) exprNode()       {}
 func (e *LiteralExpr) GetSpan() Span { return e.Span }
 
 type VariableExpr struct {
@@ -181,7 +181,7 @@ type VariableExpr struct {
 	Span Span
 }
 
-func (*VariableExpr) exprNode()     {}
+func (*VariableExpr) exprNode()       {}
 func (e *VariableExpr) GetSpan() Span { return e.Span }
 
 type PropertyExpr struct {
@@ -190,7 +190,7 @@ type PropertyExpr struct {
 	Span   Span
 }
 
-func (*PropertyExpr) exprNode()     {}
+func (*PropertyExpr) exprNode()       {}
 func (e *PropertyExpr) GetSpan() Span { return e.Span }
 
 type BinaryExpr struct {
@@ -200,7 +200,7 @@ type BinaryExpr struct {
 	Span  Span
 }
 
-func (*BinaryExpr) exprNode()     {}
+func (*BinaryExpr) exprNode()       {}
 func (e *BinaryExpr) GetSpan() Span { return e.Span }
 
 type UnaryExpr struct {
@@ -209,7 +209,7 @@ type UnaryExpr struct {
 	Span Span
 }
 
-func (*UnaryExpr) exprNode()     {}
+func (*UnaryExpr) exprNode()       {}
 func (e *UnaryExpr) GetSpan() Span { return e.Span }
 
 type IsNullExpr struct {
@@ -218,7 +218,7 @@ type IsNullExpr struct {
 	Span Span
 }
 
-func (*IsNullExpr) exprNode()     {}
+func (*IsNullExpr) exprNode()       {}
 func (e *IsNullExpr) GetSpan() Span { return e.Span }
 
 type FuncExpr struct {
@@ -228,7 +228,7 @@ type FuncExpr struct {
 	Span Span
 }
 
-func (*FuncExpr) exprNode()     {}
+func (*FuncExpr) exprNode()       {}
 func (e *FuncExpr) GetSpan() Span { return e.Span }
 
 type MapExpr struct {
@@ -236,7 +236,7 @@ type MapExpr struct {
 	Span    Span
 }
 
-func (*MapExpr) exprNode()     {}
+func (*MapExpr) exprNode()       {}
 func (e *MapExpr) GetSpan() Span { return e.Span }
 
 // StarExpr only appears inside count(*) and RETURN *.
@@ -244,7 +244,7 @@ type StarExpr struct {
 	Span Span
 }
 
-func (*StarExpr) exprNode()     {}
+func (*StarExpr) exprNode()       {}
 func (e *StarExpr) GetSpan() Span { return e.Span }
 
 // ExprText returns the canonical source-ish text used as a default column

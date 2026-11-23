@@ -57,8 +57,8 @@ func (n *Node) Unmarshal(data []byte) error {
 	return nil
 }
 
-func (n *Node) marshal() ([]byte, error)   { return n.Marshal() }
-func (n *Node) unMarshal(b []byte) error  { return n.Unmarshal(b) }
+func (n *Node) marshal() ([]byte, error) { return n.Marshal() }
+func (n *Node) unMarshal(b []byte) error { return n.Unmarshal(b) }
 
 func (n *Node) WithLabels(labels ...string) *Node {
 	n.Labels = unionStrings(n.Labels, labels...)
