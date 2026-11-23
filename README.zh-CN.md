@@ -106,7 +106,8 @@ curl -X POST localhost:7474/update \
   `sum`、`avg`、`min`、`max`、`length(p)`，以及节点/边/路径值。
 * `EXPLAIN`：输出文本执行计划，不真正执行查询。
 
-完整文法见 [`docs/lang.md`](docs/lang.md)；有意的语义差异见
+完整文法见 [`docs/lang.md`](docs/lang.md)；完整中文语法大全见
+[`docs/syntax.zh-CN.md`](docs/syntax.zh-CN.md)；有意的语义差异见
 [`docs/cypher-deviations.md`](docs/cypher-deviations.md)；不支持的语法见
 [`docs/neo4j-skip-list.md`](docs/neo4j-skip-list.md)。
 

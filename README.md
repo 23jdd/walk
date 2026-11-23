@@ -106,6 +106,8 @@ Supported Cypher subset:
 
 See `docs/lang.md` for the EBNF, `docs/cypher-deviations.md` for deliberate
 semantic differences, and `docs/neo4j-skip-list.md` for unsupported syntax.
+A complete Chinese syntax reference is in
+[`docs/syntax.zh-CN.md`](docs/syntax.zh-CN.md).
 
 ## Storage and invariants
 
