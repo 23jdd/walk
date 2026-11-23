@@ -156,6 +156,102 @@ func (e *Exec) Hop(in Stream, src string, dir Dir, typeIDs []uint64, via, as str
 	}
 }
 
+// HopWithPath extends an existing path binding (or starts one) while hopping.
+func (e *Exec) HopWithPath(in Stream, src string, dir Dir, typeIDs []uint64, via, as, pathAs string) Stream {
+	return func(yield func(Solution) bool) {
+		for sol := range in {
+			if err := e.Check(); err != nil {
+				return
+			}
+			ent, ok := sol[src]
+			if !ok || !ent.IsNode() {
+				e.Fail(fmt.Errorf("%w: hop source %q is not a node", ErrTypeMismatch, src))
+				return
+			}
+			var base *Path
+			if pathAs != "" {
+				if p, ok := sol[pathAs]; ok && p.IsPath() {
+					base = p.Path
+				}
+			}
+			for adj := range e.Adjacent(ent.Id, dir, typeIDs) {
+				if err := e.Emit(); err != nil {
+					return
+				}
+				next := CloneSolution(sol)
+				endpoint := adj.Endpoint(ent.Id)
+				if as != "" {
+					next[as] = NodeEntity(endpoint)
+				}
+				if via != "" {
+					next[via] = EdgeEntity(adj.EdgeID)
+				}
+				if pathAs != "" {
+					var p *Path
+					if base != nil {
+						p = base.Clone()
+						p.Nodes = append(p.Nodes, endpoint)
+						p.Edges = append(p.Edges, adj.EdgeID)
+					} else {
+						p = &Path{Nodes: []uint64{ent.Id, endpoint}, Edges: []uint64{adj.EdgeID}}
+					}
+					next[pathAs] = PathEntity(p)
+				}
+				if !yield(next) {
+					return
+				}
+			}
+		}
+	}
+}
+
+// StartPath binds a path containing only the anchor node.
+func (e *Exec) StartPath(in Stream, nodeVar, pathAs string) Stream {
+	if pathAs == "" {
+		return in
+	}
+	return func(yield func(Solution) bool) {
+		for sol := range in {
+			ent, ok := sol[nodeVar]
+			if !ok || !ent.IsNode() {
+				e.Fail(fmt.Errorf("%w: path anchor %q is not a node", ErrTypeMismatch, nodeVar))
+				return
+			}
+			next := CloneSolution(sol)
+			next[pathAs] = PathEntity(&Path{Nodes: []uint64{ent.Id}})
+			if !yield(next) {
+				return
+			}
+		}
+	}
+}
+
+// CrossJoin pairs every left solution with every right solution. The right
+// stream is re-evaluated for each left row, which keeps it streaming.
+func CrossJoin(left, right Stream) Stream {
+	return func(yield func(Solution) bool) {
+		for l := range left {
+			for r := range right {
+				next := CloneSolution(l)
+				conflict := false
+				for k, v := range r {
+					if old, ok := next[k]; ok && (old.Kind != v.Kind || old.Id != v.Id || old.Path != v.Path) {
+						conflict = true
+						break
+					}
+					next[k] = v
+				}
+				if conflict {
+					continue
+				}
+				if !yield(next) {
+					return
+				}
+			}
+		}
+	}
+}
+
 // VarLen enumerates simple-edge paths of length lo..hi (F-10). Relationship
 // uniqueness is enforced per path; nodes may repeat.
 func (e *Exec) VarLen(in Stream, src string, dir Dir, typeIDs []uint64, lo, hi int, as string) Stream {
@@ -465,6 +561,11 @@ func (e *Exec) SetProp(in Stream, v, prop string, ex EvalFunc) Stream {
 
 // SetMap overwrites all properties of a node with a map expression.
 func (e *Exec) SetMap(in Stream, v string, ex func(Solution) (map[string]Value, error)) Stream {
+	return e.SetMapMode(in, v, ex, true)
+}
+
+// SetMapMode replaces (replace=true) or merges (replace=false) properties.
+func (e *Exec) SetMapMode(in Stream, v string, ex func(Solution) (map[string]Value, error), replace bool) Stream {
 	return func(yield func(Solution) bool) {
 		for sol := range in {
 			if err := e.Check(); err != nil {
@@ -480,7 +581,7 @@ func (e *Exec) SetMap(in Stream, v string, ex func(Solution) (map[string]Value, 
 				e.Fail(err)
 				return
 			}
-			if err := e.SetNodeProperties(ent.Id, props, true); err != nil {
+			if err := e.SetNodeProperties(ent.Id, props, replace); err != nil {
 				e.Fail(err)
 				return
 			}
