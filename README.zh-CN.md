@@ -13,9 +13,10 @@
 [`bbolt`](https://github.com/etcd-io/bbolt)。节点、带类型的关系边和邻接倒排索引都存储在
 同一个 B+ 树文件中，并同时提供 CLI 与 HTTP 服务接口。
 
-实现遵循 `features.md`（F-01..F-25）以及 `docs/operators.md` 中的底层算子契约
-（该文档是 `docs/算子规格与实现细节.pdf` 的 Markdown 版本）。两者冲突时，以
-`docs/operators.md` 第 7 节决策表为准。
+实现遵循 `docs/operators.md` 中的底层算子契约（该文档是
+`docs/算子规格与实现细节.pdf` 的 Markdown 版本），Cypher 文法见
+`docs/lang.md`。与 openCypher 的语义差异以 `docs/operators.md` 第 7 节
+决策表为准。
 
 ## 快速开始
 
@@ -37,10 +38,12 @@ go build -o walk ./cmd/walk
 Windows 下二进制为 `walk.exe`。默认数据库是 `./graph.db`，可用 `--db`
 参数或环境变量 `WALK_DB` 指定。
 
-## 可视化 Demo
+## 历史人物关系 App
 
-单文件、无需 npm 的演示页面：[demo.html](demo.html)。它从 jsDelivr 加载
-vis-network，通过 HTTP 调用运行中的 walk 服务。
+单文件、无需 npm 的 [demo.html](demo.html) 是一个中国历史人物关系探索 App：
+基于 vis-network，通过 walk 的 HTTP 适配器读取图谱。内置从春秋到宋的 31 位
+人物与 38 条关系（师承、君臣、盟友、思想传承等），支持朝代筛选、搜索、
+人物详情卡和最短关系链探索。
 
 ```bash
 go build -o walk ./cmd/walk
@@ -52,7 +55,7 @@ python -m http.server 8080
 # 然后访问 http://127.0.0.1:8080/demo.html
 ```
 
-点击“导入示例数据”即可生成示例图，然后在编辑器中执行查询或写入。HTTP
+首次打开点击“载入示例人物图谱”，之后点击人物即可查看详情与关系。HTTP
 服务已发送 CORS 头，因此 `file://` 页面也可以直接访问
 `http://127.0.0.1:7474`。
 
@@ -178,10 +181,10 @@ KV 操作，边批次最多 3,000 条）。`compact` 会把在线数据复制到
 cmd/walk/        CLI 入口
 executor/        存储引擎、索引、算子、解流、聚合
 parser/          Cypher 词法/AST/递归下降解析器、错误诊断
+internal/httpapi/ 可选 HTTP 适配器（query/update/stats/backup、CORS）
 walk.go          DB 生命周期、事务、备份、compact
 load.go          JSONL/CSV 导入器
-stats.go         F-21 统计
-server.go        HTTP 服务
+stats.go         统计
 engine.go        AST -> 算子链计划器
 eval.go          表达式求值器
 query.go         Query/Exec/Result API
@@ -207,5 +210,5 @@ go test . -run '^$' -bench . -benchmem
 
 v1 有意不支持：`OPTIONAL MATCH`、`WITH`、`UNWIND`、`MERGE`、`CALL`、
 `UNION`、加权最短路径（Dijkstra）、嵌套/列表属性、全文与地理索引、
-多数据库与集群。详见 `features.md` 第 10 节与
-[`docs/cypher-deviations.md`](docs/cypher-deviations.md)。
+多数据库与集群。详见 [`docs/cypher-deviations.md`](docs/cypher-deviations.md)
+与 [`docs/neo4j-skip-list.md`](docs/neo4j-skip-list.md)。

@@ -14,9 +14,10 @@ query engine built on [`bbolt`](https://github.com/etcd-io/bbolt). It stores
 nodes, typed edges and adjacency postings in one B+tree file, and exposes the
 graph through a CLI and an HTTP service.
 
-The implementation follows `features.md` (F-01..F-25) and the lower-level
-operator contract in `docs/operators.md` (the Markdown form of
-`docs/算子规格与实现细节.pdf`). Where the two disagree, the decision table in
+The implementation follows the lower-level operator contract in
+`docs/operators.md` (the Markdown form of
+`docs/算子规格与实现细节.pdf`), with the Cypher grammar in `docs/lang.md`.
+Where semantics differ from openCypher, the decision table in
 `docs/operators.md` wins.
 
 ## Quick start
@@ -39,10 +40,13 @@ go build -o walk ./cmd/walk
 On Windows the binary is `walk.exe`. The default database is `./graph.db`;
 override it with `--db` or the `WALK_DB` environment variable.
 
-## Demo
+## Historical figures demo
 
-A single-file, npm-free demo lives in [demo.html](demo.html). It loads
-vis-network from jsDelivr and talks to the running walk service over HTTP.
+A single-file, npm-free app lives in [demo.html](demo.html): a Chinese
+historical-figures relationship explorer powered by vis-network and walk's
+HTTP adapter. It ships with 31 people from 春秋 to 宋 and 38 relationships
+(师承、君臣、盟友、思想传承…), plus dynasty filters, search, detail cards and
+shortest relationship-chain discovery.
 
 ```bash
 go build -o walk ./cmd/walk
@@ -54,8 +58,8 @@ python -m http.server 8080
 # visit http://127.0.0.1:8080/demo.html
 ```
 
-Click “导入示例数据” to seed the graph, then run queries or writes in the
-editor. The server sends CORS headers, so a `file://` page can call
+Click “载入示例人物图谱” on first run, then click a person to explore. The
+server sends CORS headers, so a `file://` page can call
 `http://127.0.0.1:7474` directly.
 
 ## CLI
@@ -154,10 +158,10 @@ atomically replaces the old file.
 cmd/walk/        CLI entry point
 executor/        storage engine, indices, operators, streams, aggregation
 parser/          Cypher lexer, AST, recursive-descent parser, diagnostics
+internal/httpapi/ optional HTTP adapter (query/update/stats/backup, CORS)
 walk.go          DB lifecycle, transactions, backup, compact
 load.go          JSONL/CSV importers
-stats.go         F-21 statistics
-server.go        HTTP service
+stats.go         statistics
 engine.go        AST -> operator chain planner
 eval.go          expression evaluator
 query.go         Query/Exec/Result API
@@ -180,5 +184,5 @@ ordering, JSONL/CSV import, HTTP endpoints and compaction/backup.
 
 Deliberately out of scope for v1: `OPTIONAL MATCH`, `WITH`, `UNWIND`, `MERGE`,
 `CALL`, `UNION`, weighted shortest paths, nested/list properties, full-text and
-geo indexes, multi-database and clustering. See `features.md` §10 and
-`docs/cypher-deviations.md`.
+geo indexes, multi-database and clustering. See
+`docs/cypher-deviations.md` and `docs/neo4j-skip-list.md`.
